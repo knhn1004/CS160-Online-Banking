@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+
+enum RoleEnum {
+  customer
+  bank_manager
+}
+
+model User {
+  id          Int       @id @default(autoincrement())
+  user_id     String    @unique
+  created_at  DateTime  @default(now())
+  first_name  String?
+  last_name   String?
+  email       String?
+  password    String
+  phone       String?
+  address     String?
+  role        RoleEnum
+  zip_code    Int
+  accounts    Account[]
+
+  @@map("users")
+}
+
+enum AccountTypeEnum {
+  savings
+  checkings
+}
+
+model Account {
+  id                Int              @id @default(autoincrement())
+  account_number    Int?
+  routing_number    Int?
+  userId            Int?
+  created_at        DateTime         @default(now())
+  account_type      AccountTypeEnum?
+  active            Boolean?
+  balance           Float?
+  is_internal       Boolean          @default(true)
+
+  user              User?            @relation(fields: [userId], references: [id])
+  transactionsFrom  Transaction[]    @relation("source")
+  transactionsTo    Transaction[]    @relation("destination")
+  paymentRulesFrom  PaymentRule[]    @relation("payment_source")
+  paymentRulesTo    PaymentRule[]    @relation("payment_destination")
+
+  @@map("accounts")
+}
+
+enum TransactionStatusEnum {
+  approved
+  denial
+}
+
+enum TransactionTypeEnum {
+  internal_transfer
+  external_transfer
+  deposit
+  withdrawal
+}
+
+model Transaction {
+  id                      Int                     @id @default(autoincrement())
+  sourceAccountId         Int?
+  destinationAccountId    Int?
+  created_at              DateTime                @default(now())
+  updated_at              DateTime                @updatedAt
+  status                  TransactionStatusEnum
+  amount                  Float
+  transaction_type        TransactionTypeEnum
+
+  sourceAccount           Account?                @relation("source", fields: [sourceAccountId], references: [id])
+  destinationAccount      Account?                @relation("destination", fields: [destinationAccountId], references: [id])
+
+  @@map("transactions")
+}
+
+model PaymentRule {
+  id                    Int        @id @default(autoincrement())
+  sourceAccountId       Int
+  destinationAccountId  Int
+  amount                Float
+  frequency             String
+  start_time            DateTime
+  end_time              DateTime?
+
+  sourceAccount         Account    @relation("payment_source", fields: [sourceAccountId], references: [id])
+  destinationAccount    Account    @relation("payment_destination", fields: [destinationAccountId], references: [id])
+
+  @@map("payment_rules")
+}
