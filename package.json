@@ -9,7 +9,9 @@
 		"lint": "next lint",
 		"deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
 		"preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-		"cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts"
+		"cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts",
+		"seed": "prisma db seed",
+		"prisma:generate": "prisma generate"
 	},
 	"dependencies": {
 		"@opennextjs/cloudflare": "^1.3.0",
@@ -34,5 +36,9 @@
 		"tsx": "^4.20.5",
 		"typescript": "^5",
 		"wrangler": "^4.40.0"
+	}
+,
+	"prisma": {
+		"seed": "tsx prisma/seed.ts"
 	}
 }
