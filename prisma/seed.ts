@@ -219,7 +219,7 @@ async function main() {
         sourceAccountId: avaChk.id,
         destinationAccountId: avaSav.id,
         amount: 100,
-        frequency: 'monthly',
+        frequency: '0 0 1 * *', // monthly
         start_time: now,
         end_time: null,
       },
@@ -229,7 +229,7 @@ async function main() {
         sourceAccountId: liamChk.id,
         destinationAccountId: bankOps.id,
         amount: 45,
-        frequency: 'monthly',
+        frequency: '0 0 1 * *', // monthly
         start_time: nextMonth,
         end_time: null,
       },
