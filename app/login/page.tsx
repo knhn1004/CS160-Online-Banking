@@ -32,8 +32,11 @@ export default function LoginPage() {
     <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
         <div className="space-y-1">
-          <label className="text-sm font-medium">Email</label>
+          <label htmlFor="email" className="text-sm font-medium">
+            Email
+          </label>
           <Input
+            id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -42,8 +45,11 @@ export default function LoginPage() {
           />
         </div>
         <div className="space-y-1">
-          <label className="text-sm font-medium">Password</label>
+          <label htmlFor="password" className="text-sm font-medium">
+            Password
+          </label>
           <Input
+            id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

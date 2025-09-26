@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "test": "vitest run --coverage",

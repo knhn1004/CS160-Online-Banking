@@ -19,4 +19,3 @@ describe("LoginPage", () => {
     ).toBeInTheDocument();
   });
 });
-

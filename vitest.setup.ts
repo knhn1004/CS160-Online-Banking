@@ -8,3 +8,15 @@ vi.mock("next/navigation", async () => {
     usePathname: () => "/",
   };
 });
+
+// Supabase browser client mock to avoid env requirement in tests
+vi.mock("@/utils/supabase/client", () => ({
+  createClient: () => ({
+    auth: {
+      getUser: () => Promise.resolve({ data: { user: null } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signOut: () => Promise.resolve({}),
+      signInWithPassword: () => Promise.resolve({ data: {}, error: null }),
+    },
+  }),
+}));
