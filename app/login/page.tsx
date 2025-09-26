@@ -16,7 +16,10 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     setLoading(false);
     if (error) {
       setError(error.message);
@@ -47,9 +50,7 @@ export default function LoginPage() {
             required
           />
         </div>
-        {error ? (
-          <p className="text-sm text-red-600">{error}</p>
-        ) : null}
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <Button type="submit" disabled={loading} className="w-full">
           {loading ? "Signing in..." : "Sign in"}
         </Button>
@@ -57,5 +58,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-

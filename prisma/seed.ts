@@ -1,6 +1,12 @@
-import { PrismaClient, RoleEnum, AccountTypeEnum, TransactionStatusEnum, TransactionTypeEnum } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
+import {
+  PrismaClient,
+  RoleEnum,
+  AccountTypeEnum,
+  TransactionStatusEnum,
+  TransactionTypeEnum,
+} from "@prisma/client";
+import { randomUUID } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
 
 const prisma = new PrismaClient();
 
@@ -14,11 +20,17 @@ async function main() {
   ]);
 
   // Users: create in Supabase Auth (if service role available) and link via auth_user_id
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string | undefined;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as
+    | string
+    | undefined;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as
+    | string
+    | undefined;
   const canUseSupabaseAdmin = Boolean(supabaseUrl && supabaseServiceKey);
 
-  const supabase = canUseSupabaseAdmin ? createClient(supabaseUrl!, supabaseServiceKey!) : null;
+  const supabase = canUseSupabaseAdmin
+    ? createClient(supabaseUrl!, supabaseServiceKey!)
+    : null;
 
   type SeedUser = {
     user_id: string;
@@ -34,38 +46,38 @@ async function main() {
 
   const usersToCreate: SeedUser[] = [
     {
-      user_id: 'mgr-0001',
-      first_name: 'Morgan',
-      last_name: 'Banks',
-      email: 'manager@example.com',
-      phone: '555-0001',
-      address: '1 Manager Way, San Francisco, CA',
+      user_id: "mgr-0001",
+      first_name: "Morgan",
+      last_name: "Banks",
+      email: "manager@example.com",
+      phone: "555-0001",
+      address: "1 Manager Way, San Francisco, CA",
       role: RoleEnum.bank_manager,
       zip_code: 94105,
-      password: 'Password123!'
+      password: "Password123!",
     },
     {
-      user_id: 'cust-1001',
-      first_name: 'Ava',
-      last_name: 'Smith',
-      email: 'ava@example.com',
-      phone: '555-1001',
-      address: '100 Main St, Daly City, CA',
+      user_id: "cust-1001",
+      first_name: "Ava",
+      last_name: "Smith",
+      email: "ava@example.com",
+      phone: "555-1001",
+      address: "100 Main St, Daly City, CA",
       role: RoleEnum.customer,
       zip_code: 94016,
-      password: 'Password123!'
+      password: "Password123!",
     },
     {
-      user_id: 'cust-1002',
-      first_name: 'Liam',
-      last_name: 'Jones',
-      email: 'liam@example.com',
-      phone: '555-1002',
-      address: '200 Main St, Daly City, CA',
+      user_id: "cust-1002",
+      first_name: "Liam",
+      last_name: "Jones",
+      email: "liam@example.com",
+      phone: "555-1002",
+      address: "200 Main St, Daly City, CA",
       role: RoleEnum.customer,
       zip_code: 94016,
-      password: 'Password123!'
-    }
+      password: "Password123!",
+    },
   ];
 
   const createdUsers = [] as { id: number; email: string }[];
@@ -76,10 +88,13 @@ async function main() {
       const { data, error } = await supabase.auth.admin.createUser({
         email: u.email,
         password: u.password,
-        email_confirm: true
+        email_confirm: true,
       });
       if (error) {
-        console.warn(`Supabase admin createUser failed for ${u.email}:`, error.message);
+        console.warn(
+          `Supabase admin createUser failed for ${u.email}:`,
+          error.message,
+        );
       } else if (data.user?.id) {
         authUserId = data.user.id;
       }
@@ -99,12 +114,18 @@ async function main() {
         auth_user_id: authUserId,
       } as any,
     });
-    createdUsers.push({ id: created.id, email: created.email ?? '' });
+    createdUsers.push({ id: created.id, email: created.email ?? "" });
   }
 
-  const manager = await prisma.user.findUniqueOrThrow({ where: { user_id: 'mgr-0001' } });
-  const ava = await prisma.user.findUniqueOrThrow({ where: { user_id: 'cust-1001' } });
-  const liam = await prisma.user.findUniqueOrThrow({ where: { user_id: 'cust-1002' } });
+  const manager = await prisma.user.findUniqueOrThrow({
+    where: { user_id: "mgr-0001" },
+  });
+  const ava = await prisma.user.findUniqueOrThrow({
+    where: { user_id: "cust-1001" },
+  });
+  const liam = await prisma.user.findUniqueOrThrow({
+    where: { user_id: "cust-1002" },
+  });
 
   // Accounts
   const [bankOps, avaChk, avaSav, liamChk] = await prisma.$transaction([
@@ -219,7 +240,7 @@ async function main() {
         sourceAccountId: avaChk.id,
         destinationAccountId: avaSav.id,
         amount: 100,
-        frequency: '0 0 1 * *', // monthly
+        frequency: "0 0 1 * *", // monthly
         start_time: now,
         end_time: null,
       },
@@ -229,14 +250,14 @@ async function main() {
         sourceAccountId: liamChk.id,
         destinationAccountId: bankOps.id,
         amount: 45,
-        frequency: '0 0 1 * *', // monthly
+        frequency: "0 0 1 * *", // monthly
         start_time: nextMonth,
         end_time: null,
       },
     }),
   ]);
 
-  console.log('Database seeded successfully');
+  console.log("Database seeded successfully");
 }
 
 main()
@@ -247,5 +268,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-
-

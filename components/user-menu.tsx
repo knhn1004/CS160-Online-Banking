@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
+import type { User } from "@supabase/supabase-js";
 
 type Profile = {
   name?: string | null;
@@ -30,7 +31,7 @@ export function UserMenu() {
 
     let isMounted = true;
 
-    const setFromUser = (user: any | null) => {
+    const setFromUser = (user: User | null) => {
       if (!isMounted) return;
       if (!user) {
         setProfile(null);
@@ -46,9 +47,11 @@ export function UserMenu() {
       setInitialized(true);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setFromUser(session?.user ?? null);
-    });
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setFromUser(session?.user ?? null);
+      },
+    );
 
     return () => {
       isMounted = false;
@@ -103,5 +106,3 @@ export function UserMenu() {
     </DropdownMenu>
   );
 }
-
-

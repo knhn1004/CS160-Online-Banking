@@ -5,5 +5,3 @@ export function getPrisma() {
   const url = process.env.DIRECT_URL as string;
   return new PrismaClient({ datasourceUrl: url }).$extends(withAccelerate());
 }
-
-
