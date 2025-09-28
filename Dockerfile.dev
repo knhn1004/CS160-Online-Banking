@@ -1,0 +1,17 @@
+FROM node:22-bookworm
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml ./
+
+RUN corepack enable
+
+RUN pnpm install
+
+RUN pnpm approve-builds -a && pnpm rebuild
+
+RUN pnpm exec wrangler --version
+
+EXPOSE 3000
+
+CMD ["pnpm", "dev"]
