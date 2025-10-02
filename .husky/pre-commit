@@ -1,4 +1,4 @@
 #!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
 
+# Run lint-staged directly; Husky v9+ no longer requires sourcing husky.sh
 pnpm exec lint-staged

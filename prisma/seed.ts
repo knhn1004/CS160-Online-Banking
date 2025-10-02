@@ -4,6 +4,7 @@ import {
   AccountTypeEnum,
   TransactionStatusEnum,
   TransactionTypeEnum,
+  Prisma,
 } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
@@ -100,19 +101,20 @@ async function main() {
       }
     }
 
+    const userData = {
+      user_id: u.user_id,
+      first_name: u.first_name,
+      last_name: u.last_name,
+      email: u.email,
+      phone: u.phone,
+      address: u.address,
+      role: u.role,
+      zip_code: u.zip_code,
+      auth_user_id: authUserId,
+    } satisfies Prisma.UserCreateInput;
+
     const created = await prisma.user.create({
-      // Cast to any due to potential lag between schema change and generated types
-      data: {
-        user_id: u.user_id,
-        first_name: u.first_name,
-        last_name: u.last_name,
-        email: u.email,
-        phone: u.phone,
-        address: u.address,
-        role: u.role,
-        zip_code: u.zip_code,
-        auth_user_id: authUserId,
-      } as any,
+      data: userData,
     });
     createdUsers.push({ id: created.id, email: created.email ?? "" });
   }
