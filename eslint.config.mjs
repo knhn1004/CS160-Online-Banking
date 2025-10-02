@@ -23,6 +23,8 @@ const eslintConfig = [
       "app/generated/prisma/**",
       "app/generated/prisma/wasm.js",
       "app/generated/prisma/wasm.d.ts",
+      // Ignore the React Native app; it has its own ESLint config under mobile/
+      "mobile/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
