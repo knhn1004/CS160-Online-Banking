@@ -6,7 +6,6 @@ import {
   TransactionTypeEnum,
   Prisma,
 } from "@prisma/client";
-import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const prisma = new PrismaClient();
@@ -20,18 +19,41 @@ async function main() {
     prisma.user.deleteMany({}),
   ]);
 
-  // Users: create in Supabase Auth (if service role available) and link via auth_user_id
+  // Users: create in Supabase Auth (require service role) and link via auth_user_id
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as
     | string
     | undefined;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as
     | string
     | undefined;
-  const canUseSupabaseAdmin = Boolean(supabaseUrl && supabaseServiceKey);
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error(
+      "Seeding requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to set real auth_user_id values.",
+    );
+  }
+  const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
-  const supabase = canUseSupabaseAdmin
-    ? createClient(supabaseUrl!, supabaseServiceKey!)
-    : null;
+  async function findSupabaseUserIdByEmail(
+    email: string,
+  ): Promise<string | null> {
+    // Paginate through users and match by email (small project scale)
+    let page = 1;
+    const perPage = 1000;
+    for (let i = 0; i < 10; i++) {
+      const { data, error } = await supabase.auth.admin.listUsers({
+        page,
+        perPage,
+      });
+      if (error) throw error;
+      const match = data.users.find(
+        (u) => u.email?.toLowerCase() === email.toLowerCase(),
+      );
+      if (match) return match.id;
+      if (data.users.length < perPage) break; // no more pages
+      page += 1;
+    }
+    return null;
+  }
 
   type SeedUser = {
     user_id: string;
@@ -84,21 +106,20 @@ async function main() {
   const createdUsers = [] as { id: number; email: string }[];
 
   for (const u of usersToCreate) {
-    let authUserId: string = randomUUID();
-    if (supabase) {
+    // Use existing Supabase user if found, otherwise create a new one
+    let authUserId: string | null = await findSupabaseUserIdByEmail(u.email);
+    if (!authUserId) {
       const { data, error } = await supabase.auth.admin.createUser({
         email: u.email,
         password: u.password,
         email_confirm: true,
       });
       if (error) {
-        console.warn(
-          `Supabase admin createUser failed for ${u.email}:`,
-          error.message,
+        throw new Error(
+          `Supabase admin createUser failed for ${u.email}: ${error.message}`,
         );
-      } else if (data.user?.id) {
-        authUserId = data.user.id;
       }
+      authUserId = data.user!.id;
     }
 
     const userData = {
