@@ -96,7 +96,7 @@ enum USStateTerritory {
 model InternalAccount {
   id                  Int              @id @default(autoincrement())
   account_number      String           @unique @db.VarChar(17)                        // For an internal account, all issued account numbers should be unique. As per ACH, up to 17 characters are allowed. Banks issue their own account numbers.
-  routing_number      String           @default("724722907") @db.Char(9)                // Since this is an internal account, we default to our online bank's routing number. As per US standard, this is always 9 numbers.
+  routing_number      String           @default("724722907") @db.Char(9)              // Since this is an internal account, we default to our online bank's routing number. As per US standard, this is always 9 numbers.
   user_id             Int                                                 
   created_at          DateTime         @default(now())
   account_type        AccountTypeEnum
@@ -106,8 +106,8 @@ model InternalAccount {
   user                User             @relation(fields: [user_id], references: [id]) // Each internal account is associated with a bank user.
 
   // Back relations:
-  transfer_rules_from TransferRule[]   // Account used as source for transfer.
-  transfer_rules_to   TransferRule[]   // Account used as destination for transfer.
+  transfer_rules_from TransferRule[]   @relation("TransferSourceInternal").           // Account used as source for transfer.
+  transfer_rules_to   TransferRule[]   @relation("TransferDestinationInternal")       // Account used as destination for transfer.
   bill_payment_rules  BillPayRule[]    // Account used as source for bill pay.
   transactions        Transaction[]
 
