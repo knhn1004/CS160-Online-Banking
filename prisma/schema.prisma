@@ -8,93 +8,270 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-
-enum RoleEnum {
-  customer
-  bank_manager
-}
-
 model User {
-  id          Int       @id @default(autoincrement())
-  user_id     String    @unique
-  auth_user_id String   @unique @db.Uuid
-  created_at  DateTime  @default(now())
-  first_name  String?
-  last_name   String?
-  email       String?
-  phone       String?
-  address     String?
-  role        RoleEnum
-  zip_code    Int
-  accounts    Account[]
+  id                  Int               @id @default(autoincrement())
+  username            String            @unique
+  password            String    
+  auth_user_id        String            @unique @db.Uuid              // Need more clarification on how this works... does every user have one set up?
+  created_at          DateTime          @default(now())
+  first_name          String
+  last_name           String
+  email               String            @unique                       
+  phone_number        String            @unique @db.VarChar(12)       // Database entries for phone number should be standardized to E.164 format.
+  street_address      String   
+  address_line_2      String?
+  city                String
+  state_or_territory  USStateTerritory                                // Making the assumption that we only support US customers.
+  postal_code         String            @db.VarChar(10)               // ZIP or ZIP+4 supported.
+  country             String            @default("United States")     // Leaving this field in, but should be noted that we ONLY support US customers.               
+  role                RoleEnum
 
   @@map("users")
 }
 
+enum RoleEnum {
+  CUSTOMER
+  BANK_MANAGER
+}
+
+enum USStateTerritory {
+  AL 
+  AK 
+  AZ 
+  AR 
+  CA 
+  CO 
+  CT 
+  DE 
+  DC 
+  FL 
+  GA 
+  HI 
+  ID 
+  IL 
+  IN 
+  IA 
+  KS 
+  KY 
+  LA 
+  ME
+  MD 
+  MA 
+  MI 
+  MN 
+  MS 
+  MO 
+  MT 
+  NE 
+  NV 
+  NH 
+  NJ 
+  NM 
+  NY 
+  NC 
+  ND 
+  OH 
+  OK 
+  OR 
+  PA 
+  RI
+  SC 
+  SD 
+  TN 
+  TX 
+  UT 
+  VT 
+  VA 
+  WA 
+  WV 
+  WI 
+  WY 
+  PR 
+  GU 
+  VI 
+  AS 
+  MP
+}
+
+model InternalAccount {
+  id                  Int              @id @default(autoincrement())
+  account_number      String           @unique @db.VarChar(17)                        // For an internal account, all issued account numbers should be unique. As per ACH, up to 17 characters are allowed. Banks issue their own account numbers.
+  routing_number      String           @default("724722907") @db.Char(9)                // Since this is an internal account, we default to our online bank's routing number. As per US standard, this is always 9 numbers.
+  user_id             Int                                                 
+  created_at          DateTime         @default(now())
+  account_type        AccountTypeEnum
+  is_active           Boolean          @default(true)
+  balance             Decimal          @default(0) @db.Decimal(19, 4)                 // Never use floats for money (rounding errors).
+
+  user                User             @relation(fields: [user_id], references: [id]) // Each internal account is associated with a bank user.
+
+  // Back relations:
+  transfer_rules_from TransferRule[]   // Account used as source for transfer.
+  transfer_rules_to   TransferRule[]   // Account used as destination for transfer.
+  bill_payment_rules  BillPayRule[]    // Account used as source for bill pay.
+  transactions        Transaction[]
+
+  @@map("internal_accounts")
+  @@index([user_id])
+}
+
 enum AccountTypeEnum {
-  savings
-  checkings
+  SAVINGS
+  CHECKING
 }
 
-model Account {
-  id                Int              @id @default(autoincrement())
-  account_number    Int?
-  routing_number    Int?
-  userId            Int?
-  created_at        DateTime         @default(now())
-  account_type      AccountTypeEnum?
-  active            Boolean?
-  balance           Float?
-  is_internal       Boolean          @default(true)
+// External accounts can be saved by a user to schedule transfers automatically. Otherwise, our bank does not keep track of an external account.
+model ExternalAccount {
+  id                  Int              @id @default(autoincrement())
+  nickname            String?          @db.VarChar(30)                                // Users can "name" linked external accounts for their own convenience.
+  user_id             Int
+  account_number      String           @db.VarChar(17)                                // Since our bank is not issuing the account numbers, they may not be unique.
+  routing_number      String           @db.Char(9)
 
-  user              User?            @relation(fields: [userId], references: [id])
-  transactionsFrom  Transaction[]    @relation("source")
-  transactionsTo    Transaction[]    @relation("destination")
-  paymentRulesFrom  PaymentRule[]    @relation("payment_source")
-  paymentRulesTo    PaymentRule[]    @relation("payment_destination")
+  user                User             @relation(fields: [user_id], references: [id]) // Each external account is associated with a bank user.
 
-  @@map("accounts")
-}
+  // Used by transfer rules when the destination is external.
+  transfer_rules_as_counterparty TransferRule[]  
 
-enum TransactionStatusEnum {
-  approved
-  denial
-}
-
-enum TransactionTypeEnum {
-  internal_transfer
-  external_transfer
-  deposit
-  withdrawal
+  @@map("external_accounts")
+  @@index([user_id])
+  @@unique([user_id, routing_number, account_number])                                 // Prevent a user from saving duplicate external accounts.
 }
 
 model Transaction {
   id                      Int                     @id @default(autoincrement())
-  sourceAccountId         Int?
-  destinationAccountId    Int?
   created_at              DateTime                @default(now())
   updated_at              DateTime                @updatedAt
+  amount                  Decimal                 @db.Decimal(19, 4)
   status                  TransactionStatusEnum
-  amount                  Float
   transaction_type        TransactionTypeEnum
+  check_number            String?                 @db.VarChar(12)                                             // TODO: Research how checks are made "unique".                                 
 
-  sourceAccount           Account?                @relation("source", fields: [sourceAccountId], references: [id])
-  destinationAccount      Account?                @relation("destination", fields: [destinationAccountId], references: [id])
+  // Which internal account moved the money? (source -> OUTBOUND, destination -> INBOUND)
+  internal_account_id     Int
+  internal_account        InternalAccount         @relation(fields: [internal_account_id], references: [id])
+
+  // External counterparty (if applicable):
+  external_routing_number String? @db.Char(9)
+  external_account_number String? @db.VarChar(17)
+  external_nickname       String? @db.VarChar(30) 
+
+  direction               PaymentDirection
+
+  // Optional, if you want to point back to the rule that generated it.
+  transfer_rule_id        Int?
+  bill_pay_rule_id        Int?
+  transfer_rule           TransferRule?           @relation(fields: [transfer_rule_id], references: [id])
+  bill_pay_rule           BillPayRule?            @relation(fields: [bill_pay_rule_id], references: [id])
 
   @@map("transactions")
+  @@index([internal_account_id])
+  @@index([transfer_rule_id])
+  @@index([bill_pay_rule_id])
+  @@index([internal_account_id, created_at(sort: Desc)]) 
+  @@index([status, created_at(sort: Desc)])
 }
 
-model PaymentRule {
-  id                    Int        @id @default(autoincrement())
-  sourceAccountId       Int
-  destinationAccountId  Int
-  amount                Float
-  frequency             String
+enum TransactionStatusEnum {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+enum TransactionTypeEnum {
+  INTERNAL_TRANSFER
+  EXTERNAL_TRANSFER
+  BILLPAY
+  DEPOSIT
+  WITHDRAWAL
+}
+
+enum PaymentDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum TransferKind {
+  RECURRING
+  ONE_OFF
+}
+
+// Although our bank supports bi-directional transfers, from the applicationn's perspective, we only handle internal -> internal and internal -> external scheduling.
+model TransferRule {
+  id                        Int                           @id @default(autoincrement())
+  user_id                   Int
+  transfer_kind             TransferKind                  @default(RECURRING) // Default value can be changed.
+  direction                 PaymentDirection
+  amount                    Decimal                       @db.Decimal(19, 4)
+
+  // Scheduling details:
+  frequency                 String?                                                                                           // Could make this an enum? Less customizable for the user but easier for us to handle.
+  start_time                DateTime
+  end_time                  DateTime?
+  run_at                    DateTime?                                                                                         // Used for ONE_OFF transfers.
+
+  // Transfer endpoints (source is always internal!):
+  source_internal_id        Int
+  destination_internal_id   Int?
+  destination_external_id   Int?
+
+  // Support for ONE_OFF transfers where the user doesn't save the external account.
+  external_routing_number   String?                        @db.Char(9)
+  external_account_number   String?                        @db.VarChar(17)
+
+  user                      User                           @relation(fields: [user_id], references: [id])
+  source_internal           InternalAccount                @relation("TransferRuleSource", fields: [source_internal_id], references: [id])
+  destination_internal      InternalAccount?               @relation("TransferRuleInternalDestination", fields: [destination_internal_id], references: [id])
+  destination_external      ExternalAccount?               @relation("TransferRuleExternalDestination", fields: [destination_external_id], references: [id])
+
+  transactions              Transaction[] 
+
+  @@map("transfer_rules")
+  @@index([user_id])
+  @@index([source_internal_id])
+  @@index([destination_internal_id])
+  @@index([destination_external_id])
+}
+
+// When a user tries to set up bill payment, they do not know the actual account information of the payee (usually a company account). 
+model BillPayRule {
+  id                    Int              @id @default(autoincrement())
+  user_id               Int
+  source_internal_id    Int
+  payee_id              Int 
+  amount                Decimal          @db.Decimal(19, 4)
+  frequency             String                                                                      // Could make this an enum? Less customizable for the user but easier for us to handle.
   start_time            DateTime
   end_time              DateTime?
 
-  sourceAccount         Account    @relation("payment_source", fields: [sourceAccountId], references: [id])
-  destinationAccount    Account    @relation("payment_destination", fields: [destinationAccountId], references: [id])
+  user                  User             @relation(fields: [user_id], references: [id])
+  source_internal       InternalAccount  @relation(fields: [source_internal_id], references: [id])
+  payee                 BillPayPayee     @relation(fields: [payee_id], references: [id])
 
-  @@map("payment_rules")
+  transactions          Transaction[] 
+
+  @@map("billpay_rules")
+  @@index([user_id])
+  @@index([source_internal_id])
+  @@index([payee_id])
 }
+
+// Please note that registering to use our online bank's bill pay services is separate from registering to open an account.
+model BillPayPayee {
+  id                    Int                 @id @default(autoincrement())
+  business_name         String
+  email                 String  
+  phone                 String
+  street_address        String
+  address_line_2        String?
+  city                  String
+  state_or_territory    USStateTerritory
+  postal_code           String              @db.VarChar(10)
+  country               String              @default("United States")
+  account_number        String              @db.VarChar(17)
+  routing_number        String              @db.Char(9)
+
+  @@map("billpay_payees")
+  @@index([business_name])
+}
+
