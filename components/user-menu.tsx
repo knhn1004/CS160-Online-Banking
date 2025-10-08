@@ -69,12 +69,19 @@ export function UserMenu() {
   if (!initialized) return null;
   // Hide on login page entirely
   if (pathname === "/login") return null;
-  // When logged out: show Login button
+  // When logged out: show Login button and ATM location button
   if (!profile) {
     return (
-      <Link href="/login">
-        <Button size="sm">Login</Button>
-      </Link>
+      <div className="flex items-center gap-3">
+        <Link href="/atm-locations">
+          <Button size="sm" variant="outline">
+            ATM Locations
+          </Button>
+        </Link>
+        <Link href="/login">
+          <Button size="sm">Login</Button>
+        </Link>
+      </div>
     );
   }
 
