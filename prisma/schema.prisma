@@ -106,7 +106,7 @@ model InternalAccount {
   user                User             @relation(fields: [user_id], references: [id]) // Each internal account is associated with a bank user.
 
   // Back relations:
-  transfer_rules_from TransferRule[]   @relation("TransferSourceInternal").           // Account used as source for transfer.
+  transfer_rules_from TransferRule[]   @relation("TransferSourceInternal")            // Account used as source for transfer.
   transfer_rules_to   TransferRule[]   @relation("TransferDestinationInternal")       // Account used as destination for transfer.
   bill_payment_rules  BillPayRule[]    // Account used as source for bill pay.
   transactions        Transaction[]
