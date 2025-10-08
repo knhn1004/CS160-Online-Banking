@@ -11,8 +11,7 @@ datasource db {
 model User {
   id                 Int              @id @default(autoincrement())
   username           String           @unique
-  password           String
-  auth_user_id       String           @unique @db.Uuid // Need more clarification on how this works... does every user have one set up?
+  auth_user_id       String           @unique @db.Uuid // Links to Supabase Auth user
   created_at         DateTime         @default(now())
   first_name         String
   last_name          String
@@ -23,7 +22,7 @@ model User {
   city               String
   state_or_territory USStateTerritory // Making the assumption that we only support US customers.
   postal_code        String           @db.VarChar(10) // ZIP or ZIP+4 supported.
-  country            String           @default("United States") // Leaving this field in, but should be noted that we ONLY support US customers.               
+  country            String           @default("United States")               
   role               RoleEnum
 
   internal_accounts InternalAccount[]
@@ -35,8 +34,8 @@ model User {
 }
 
 enum RoleEnum {
-  CUSTOMER
-  BANK_MANAGER
+  customer
+  bank_manager
 }
 
 enum USStateTerritory {
@@ -108,12 +107,11 @@ model InternalAccount {
   is_active      Boolean         @default(true)
   balance        Decimal         @default(0) @db.Decimal(19, 4) // Never use floats for money (rounding errors).
 
-  user User @relation(fields: [user_id], references: [id]) // Each internal account is associated with a bank user.
+  user User @relation(fields: [user_id], references: [id])
 
-  // Back relations:
-  transfer_rules_from TransferRule[] @relation("TransferRuleSourceInternal") // Account used as source for transfer.
-  transfer_rules_to   TransferRule[] @relation("TransferRuleDestinationInternal") // Account used as destination for transfer.
-  billpay_rules       BillPayRule[] // Account used as source for bill pay.
+  transfer_rules_from TransferRule[] @relation("TransferRuleSourceInternal")
+  transfer_rules_to   TransferRule[] @relation("TransferRuleDestinationInternal")
+  billpay_rules       BillPayRule[]
   transactions        Transaction[]
 
   @@index([user_id])
@@ -121,24 +119,23 @@ model InternalAccount {
 }
 
 enum AccountTypeEnum {
-  SAVINGS
-  CHECKING
+  savings
+  checking
 }
 
 // External accounts can be saved by a user to schedule transfers automatically. Otherwise, our bank does not keep track of an external account.
 model ExternalAccount {
   id             Int     @id @default(autoincrement())
-  nickname       String? @db.VarChar(30) // Users can "name" linked external accounts for their own convenience.
+  nickname       String? @db.VarChar(30)
   user_id        Int
   account_number String  @db.VarChar(17) // Since our bank is not issuing the account numbers, they may not be unique.
   routing_number String  @db.Char(9)
 
-  user User @relation(fields: [user_id], references: [id]) // Each external account is associated with a bank user.
+  user User @relation(fields: [user_id], references: [id])
 
-  // Used by transfer rules when the destination is external. 
   transfer_rules_as_counterparty TransferRule[] @relation("TransferRuleDestinationExternal")
 
-  @@unique([user_id, routing_number, account_number]) // Prevent a user from saving duplicate external accounts.
+  @@unique([user_id, routing_number, account_number])
   @@index([user_id])
   @@map("external_accounts")
 }
@@ -150,11 +147,11 @@ model Transaction {
   amount           Decimal               @db.Decimal(19, 4)
   status           TransactionStatusEnum
   transaction_type TransactionTypeEnum
-  check_number     String?               @db.VarChar(12) // TODO: Research how checks are made "unique".                                 
+  check_number     String?               @db.VarChar(12)
 
   // Which internal account moved the money? (source -> OUTBOUND, destination -> INBOUND)
   internal_account_id Int
-  internal_account    InternalAccount @relation(fields: [internal_account_id], references: [id])
+  internal_account    InternalAccount @relation(fields: [internal_account_id], references: [id], onDelete: Cascade)
 
   // External counterparty (if applicable):
   external_routing_number String? @db.Char(9)
@@ -163,54 +160,54 @@ model Transaction {
 
   direction PaymentDirection
 
-  // Optional, if you want to point back to the rule that generated it.
   transfer_rule_id Int?
   bill_pay_rule_id Int?
-  transfer_rule    TransferRule? @relation(fields: [transfer_rule_id], references: [id])
-  bill_pay_rule    BillPayRule?  @relation(fields: [bill_pay_rule_id], references: [id])
+  transfer_rule    TransferRule? @relation(fields: [transfer_rule_id], references: [id], onDelete: SetNull)
+  bill_pay_rule    BillPayRule?  @relation(fields: [bill_pay_rule_id], references: [id], onDelete: SetNull)
 
   @@index([internal_account_id])
   @@index([transfer_rule_id])
   @@index([bill_pay_rule_id])
   @@index([internal_account_id, created_at(sort: Desc)])
   @@index([status, created_at(sort: Desc)])
+  @@index([status, transaction_type])
   @@map("transactions")
 }
 
 enum TransactionStatusEnum {
-  PENDING
-  APPROVED
-  DENIED
+  pending
+  approved
+  denied
 }
 
 enum TransactionTypeEnum {
-  INTERNAL_TRANSFER
-  EXTERNAL_TRANSFER
-  BILLPAY
-  DEPOSIT
-  WITHDRAWAL
+  internal_transfer
+  external_transfer
+  billpay
+  deposit
+  withdrawal
 }
 
 enum PaymentDirection {
-  OUTBOUND
-  INBOUND
+  outbound
+  inbound
 }
 
 enum TransferKind {
-  RECURRING
-  ONE_OFF
+  recurring
+  one_off
 }
 
 // Although our bank supports bi-directional transfers, from the applicationn's perspective, we only handle internal -> internal and internal -> external scheduling.
 model TransferRule {
   id            Int              @id @default(autoincrement())
   user_id       Int
-  transfer_kind TransferKind     @default(RECURRING) // Default value can be changed.
+  transfer_kind TransferKind     @default(recurring)
   direction     PaymentDirection
   amount        Decimal          @db.Decimal(19, 4)
 
   // Scheduling details:
-  frequency  String? // Could make this an enum? Less customizable for the user but easier for us to handle.
+  frequency  String?
   start_time DateTime
   end_time   DateTime?
   run_at     DateTime? // Used for ONE_OFF transfers.
@@ -245,7 +242,7 @@ model BillPayRule {
   source_internal_id Int
   payee_id           Int
   amount             Decimal   @db.Decimal(19, 4)
-  frequency          String // Could make this an enum? Less customizable for the user but easier for us to handle.
+  frequency          String
   start_time         DateTime
   end_time           DateTime?
 
