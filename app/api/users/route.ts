@@ -3,11 +3,16 @@ import { getPrisma } from "@/app/lib/prisma";
 
 type CreateUserRequest = {
   auth_user_id: string;
+  username: string;
   email: string;
   first_name: string;
   last_name: string;
-  phone?: string;
-  zip_code: number;
+  phone_number: string;
+  street_address: string;
+  address_line_2?: string;
+  city: string;
+  state_or_territory: string;
+  postal_code: string;
   role?: "customer" | "bank_manager";
 };
 
@@ -16,16 +21,32 @@ export async function POST(request: NextRequest) {
     const body: CreateUserRequest = await request.json();
     const {
       auth_user_id,
+      username,
       email,
       first_name,
       last_name,
-      phone,
-      zip_code,
+      phone_number,
+      street_address,
+      address_line_2,
+      city,
+      state_or_territory,
+      postal_code,
       role = "customer",
     } = body;
 
     // Validate required fields
-    if (!auth_user_id || !email || !first_name || !last_name || !zip_code) {
+    if (
+      !auth_user_id ||
+      !username ||
+      !email ||
+      !first_name ||
+      !last_name ||
+      !phone_number ||
+      !street_address ||
+      !city ||
+      !state_or_territory ||
+      !postal_code
+    ) {
       return NextResponse.json(
         {
           message: "Missing required fields.",
@@ -34,17 +55,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if email already exists
+    // Check if email or username already exists
     const prisma = getPrisma();
-    const existingUser = await prisma.user.findFirst({
+    const existingUserByEmail = await prisma.user.findFirst({
       where: { email: email },
     });
 
-    if (existingUser) {
+    if (existingUserByEmail) {
       return NextResponse.json(
         {
           message:
             "Email already exists. Please use a different email address.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const existingUserByUsername = await prisma.user.findFirst({
+      where: { username: username },
+    });
+
+    if (existingUserByUsername) {
+      return NextResponse.json(
+        {
+          message: "Username already exists. Please use a different username.",
         },
         { status: 409 },
       );
@@ -56,13 +90,73 @@ export async function POST(request: NextRequest) {
     // Create user in database
     const user = await prisma.user.create({
       data: {
-        user_id,
         auth_user_id,
-        email: email,
-        first_name: first_name,
-        last_name: last_name,
-        phone: phone || null,
-        zip_code: zip_code,
+        username,
+        email,
+        first_name,
+        last_name,
+        phone_number,
+        street_address,
+        address_line_2: address_line_2 || null,
+        city,
+        state_or_territory: state_or_territory as
+          | "AL"
+          | "AK"
+          | "AZ"
+          | "AR"
+          | "CA"
+          | "CO"
+          | "CT"
+          | "DE"
+          | "DC"
+          | "FL"
+          | "GA"
+          | "HI"
+          | "ID"
+          | "IL"
+          | "IN"
+          | "IA"
+          | "KS"
+          | "KY"
+          | "LA"
+          | "ME"
+          | "MD"
+          | "MA"
+          | "MI"
+          | "MN"
+          | "MS"
+          | "MO"
+          | "MT"
+          | "NE"
+          | "NV"
+          | "NH"
+          | "NJ"
+          | "NM"
+          | "NY"
+          | "NC"
+          | "ND"
+          | "OH"
+          | "OK"
+          | "OR"
+          | "PA"
+          | "RI"
+          | "SC"
+          | "SD"
+          | "TN"
+          | "TX"
+          | "UT"
+          | "VT"
+          | "VA"
+          | "WA"
+          | "WV"
+          | "WI"
+          | "WY"
+          | "PR"
+          | "GU"
+          | "VI"
+          | "AS"
+          | "MP",
+        postal_code,
         role: role as "customer" | "bank_manager",
       },
     });
@@ -72,7 +166,6 @@ export async function POST(request: NextRequest) {
         message: "User created successfully",
         user: {
           id: user.id,
-          user_id: user.user_id,
           email: user.email,
           first_name: user.first_name,
           last_name: user.last_name,

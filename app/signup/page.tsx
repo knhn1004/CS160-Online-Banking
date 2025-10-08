@@ -7,22 +7,29 @@ import { Button } from "@/components/ui/button";
 
 export default function SignupPage() {
   // Form Fields
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [streetAddress, setStreetAddress] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
   const [city, setCity] = useState("");
-  const [state, setState] = useState("");
-  const [zipCode, setZipCode] = useState("");
+  const [stateOrTerritory, setStateOrTerritory] = useState("");
+  const [postalCode, setPostalCode] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const validateForm = () => {
     const errors: string[] = [];
+
+    // Username validation
+    if (!username || username.length < 3) {
+      errors.push("Username must be at least 3 characters");
+    }
 
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -35,10 +42,23 @@ export default function SignupPage() {
       errors.push("Passwords do not match");
     }
 
-    // Zip code validation
-    if (!zipCode || !/^\d{5}$/.test(zipCode)) {
-      errors.push("Zip code must be 5 digits");
+    // Phone number validation (E.164 format)
+    const phoneRegex = /^\+1\d{10}$/;
+    if (!phoneNumber || !phoneRegex.test(phoneNumber)) {
+      errors.push("Phone number must be in format +1XXXXXXXXXX");
     }
+
+    // Postal code validation
+    if (!postalCode || !/^\d{5}(-\d{4})?$/.test(postalCode)) {
+      errors.push("Postal code must be 5 digits or ZIP+4 format");
+    }
+
+    // Required field validation
+    if (!firstName) errors.push("First name is required");
+    if (!lastName) errors.push("Last name is required");
+    if (!streetAddress) errors.push("Street address is required");
+    if (!city) errors.push("City is required");
+    if (!stateOrTerritory) errors.push("State is required");
 
     return errors;
   };
@@ -79,14 +99,16 @@ export default function SignupPage() {
         },
         body: JSON.stringify({
           auth_user_id: authData.user?.id,
+          username,
           email,
-          first_name: firstName || null,
-          last_name: lastName || null,
-          phone: phone || null,
-          address: address || null,
-          city: city || null,
-          state: state || null,
-          zip_code: parseInt(zipCode),
+          first_name: firstName,
+          last_name: lastName,
+          phone_number: phoneNumber,
+          street_address: streetAddress,
+          address_line_2: addressLine2 || null,
+          city,
+          state_or_territory: stateOrTerritory,
+          postal_code: postalCode,
           role: "customer",
         }),
       });
@@ -108,6 +130,20 @@ export default function SignupPage() {
   return (
     <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
+        <div className="space-y-1">
+          <label htmlFor="username" className="text-sm font-medium">
+            Username
+            <span className="text-red-500 text-xs ml-1">*</span>
+          </label>
+          <Input
+            id="username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            placeholder="johndoe"
+          />
+        </div>
         <div className="space-y-1">
           <label htmlFor="email" className="text-sm font-medium">
             Email
@@ -175,28 +211,44 @@ export default function SignupPage() {
           />
         </div>
         <div className="space-y-1">
-          <label htmlFor="phone" className="text-sm font-medium">
+          <label htmlFor="phoneNumber" className="text-sm font-medium">
             Phone Number
+            <span className="text-red-500 text-xs ml-1">*</span>
           </label>
           <Input
-            id="phone"
+            id="phoneNumber"
             type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            required
+            placeholder="+15551234567"
           />
         </div>
         <div className="space-y-1">
-          <label htmlFor="address" className="text-sm font-medium">
+          <label htmlFor="streetAddress" className="text-sm font-medium">
             Street Address
             <span className="text-red-500 text-xs ml-1">*</span>
           </label>
           <Input
-            id="address"
+            id="streetAddress"
             type="text"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
+            value={streetAddress}
+            onChange={(e) => setStreetAddress(e.target.value)}
             placeholder="123 Main St"
             required
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="addressLine2" className="text-sm font-medium">
+            Address Line 2
+            <span className="text-gray-500 text-xs ml-1">(optional)</span>
+          </label>
+          <Input
+            id="addressLine2"
+            type="text"
+            value={addressLine2}
+            onChange={(e) => setAddressLine2(e.target.value)}
+            placeholder="Apt 4B"
           />
         </div>
         <div className="space-y-1">
@@ -214,32 +266,89 @@ export default function SignupPage() {
           />
         </div>
         <div className="space-y-1">
-          <label htmlFor="state" className="text-sm font-medium">
-            State
+          <label htmlFor="stateOrTerritory" className="text-sm font-medium">
+            State/Territory
             <span className="text-red-500 text-xs ml-1">*</span>
           </label>
-          <Input
-            id="state"
-            type="text"
-            value={state}
-            onChange={(e) => setState(e.target.value)}
-            placeholder="CA"
-            maxLength={2}
+          <select
+            id="stateOrTerritory"
+            value={stateOrTerritory}
+            onChange={(e) => setStateOrTerritory(e.target.value)}
             required
-          />
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">Select State/Territory</option>
+            <option value="AL">Alabama</option>
+            <option value="AK">Alaska</option>
+            <option value="AZ">Arizona</option>
+            <option value="AR">Arkansas</option>
+            <option value="CA">California</option>
+            <option value="CO">Colorado</option>
+            <option value="CT">Connecticut</option>
+            <option value="DE">Delaware</option>
+            <option value="DC">District of Columbia</option>
+            <option value="FL">Florida</option>
+            <option value="GA">Georgia</option>
+            <option value="HI">Hawaii</option>
+            <option value="ID">Idaho</option>
+            <option value="IL">Illinois</option>
+            <option value="IN">Indiana</option>
+            <option value="IA">Iowa</option>
+            <option value="KS">Kansas</option>
+            <option value="KY">Kentucky</option>
+            <option value="LA">Louisiana</option>
+            <option value="ME">Maine</option>
+            <option value="MD">Maryland</option>
+            <option value="MA">Massachusetts</option>
+            <option value="MI">Michigan</option>
+            <option value="MN">Minnesota</option>
+            <option value="MS">Mississippi</option>
+            <option value="MO">Missouri</option>
+            <option value="MT">Montana</option>
+            <option value="NE">Nebraska</option>
+            <option value="NV">Nevada</option>
+            <option value="NH">New Hampshire</option>
+            <option value="NJ">New Jersey</option>
+            <option value="NM">New Mexico</option>
+            <option value="NY">New York</option>
+            <option value="NC">North Carolina</option>
+            <option value="ND">North Dakota</option>
+            <option value="OH">Ohio</option>
+            <option value="OK">Oklahoma</option>
+            <option value="OR">Oregon</option>
+            <option value="PA">Pennsylvania</option>
+            <option value="RI">Rhode Island</option>
+            <option value="SC">South Carolina</option>
+            <option value="SD">South Dakota</option>
+            <option value="TN">Tennessee</option>
+            <option value="TX">Texas</option>
+            <option value="UT">Utah</option>
+            <option value="VT">Vermont</option>
+            <option value="VA">Virginia</option>
+            <option value="WA">Washington</option>
+            <option value="WV">West Virginia</option>
+            <option value="WI">Wisconsin</option>
+            <option value="WY">Wyoming</option>
+            <option value="PR">Puerto Rico</option>
+            <option value="GU">Guam</option>
+            <option value="VI">Virgin Islands</option>
+            <option value="AS">American Samoa</option>
+            <option value="MP">Northern Mariana Islands</option>
+          </select>
         </div>
         <div className="space-y-1">
-          <label htmlFor="zipCode" className="text-sm font-medium">
-            Zip Code
+          <label htmlFor="postalCode" className="text-sm font-medium">
+            Postal Code
             <span className="text-red-500 text-xs ml-1">*</span>
           </label>
           <Input
-            id="zipCode"
+            id="postalCode"
             type="text"
-            value={zipCode}
-            onChange={(e) => setZipCode(e.target.value)}
+            value={postalCode}
+            onChange={(e) => setPostalCode(e.target.value)}
             required
-            maxLength={5}
+            placeholder="12345 or 12345-6789"
+            maxLength={10}
           />
         </div>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
