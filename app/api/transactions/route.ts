@@ -11,6 +11,9 @@ export async function GET(request: Request) {
   }
   const currentUser = await getPrisma().user.findUnique({
     where: { auth_user_id: auth.supabaseUser.id },
+    include: {
+      internal_accounts: true,
+    },
   });
   if (!currentUser) {
     return new Response(JSON.stringify({ message: "User not onboarded" }), {
@@ -18,7 +21,15 @@ export async function GET(request: Request) {
       status: 404,
     });
   }
+
+  const accountIds = currentUser.internal_accounts.map((acc) => acc.id);
+
   const transactions = await getPrisma().transaction.findMany({
+    where: {
+      internal_account_id: {
+        in: accountIds,
+      },
+    },
     orderBy: {
       created_at: "desc",
     },
