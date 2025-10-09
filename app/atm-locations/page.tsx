@@ -6,8 +6,10 @@ export default function ATMLocationsPage() {
   const mapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.Marker[]>([]);
 
   useEffect(() => {
+    // Prevent loading the script more than once
     const existingScript = document.getElementById("google-maps");
     if (existingScript) return;
 
@@ -21,12 +23,14 @@ export default function ATMLocationsPage() {
     function initMap() {
       if (!mapRef.current) return;
 
-      const defaultCenter = { lat: 37.3352, lng: -121.8811 }; // San Jose
+      const defaultCenter = { lat: 37.3352, lng: -121.8811 }; //San Jose default location
       const gmap = new google.maps.Map(mapRef.current, {
         center: defaultCenter,
         zoom: 12,
       });
       setMap(gmap);
+
+      // Autocomplete search
       if (inputRef.current) {
         const autocomplete = new google.maps.places.Autocomplete(
           inputRef.current,
@@ -42,11 +46,12 @@ export default function ATMLocationsPage() {
           gmap.setCenter(place.geometry.location);
           gmap.setZoom(14);
 
+          // Search nearby ATMs
           const service = new google.maps.places.PlacesService(gmap);
           const request = {
             location: place.geometry.location,
             radius: 3000,
-            keyword: "Chase ATM",
+            keyword: "ATM",
           };
 
           service.nearbySearch(request, (results, status) => {
@@ -54,13 +59,24 @@ export default function ATMLocationsPage() {
               status === google.maps.places.PlacesServiceStatus.OK &&
               results
             ) {
+              // clear old markers before adding new ones!!! (might change later)
+              markersRef.current.forEach((marker) => marker.setMap(null));
+              markersRef.current = [];
+
               results.forEach((result) => {
                 if (!result.geometry?.location) return;
-                new google.maps.Marker({
+
+                const marker = new google.maps.Marker({
                   map: gmap,
                   position: result.geometry.location,
                   title: result.name,
+                  icon: {
+                    url: "/bluemarker.png",
+                    scaledSize: new google.maps.Size(36, 32),
+                  },
                 });
+
+                markersRef.current.push(marker);
               });
             }
           });
@@ -77,14 +93,14 @@ export default function ATMLocationsPage() {
           ATM Locator
         </h1>
         <p className="text-lg text-gray-700 mb-8 max-w-2xl">
-          Enter your location below to find the nearest ATMs.
+          Find nearby ATMs in seconds.
         </p>
 
         <div className="w-full max-w-md mb-6">
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search by address, city, or ZIP code"
+            placeholder="Enter address, city, or ZIP code"
             className="w-full border rounded-lg px-4 py-3 shadow-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
           />
         </div>
