@@ -7,18 +7,22 @@ import { Button } from "@/components/ui/button";
 
 export default function SignupPage() {
   // Form Fields
+
+  // In Create User POST Request
   const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [email, setEmail] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
   const [city, setCity] = useState("");
   const [stateOrTerritory, setStateOrTerritory] = useState("");
   const [postalCode, setPostalCode] = useState("");
+
+  // Password Fields
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,39 +30,24 @@ export default function SignupPage() {
   const validateForm = () => {
     const errors: string[] = [];
 
-    // Username validation
-    if (!username || username.length < 3) {
-      errors.push("Username must be at least 3 characters");
-    }
-
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      errors.push("Please enter a valid email address");
-    }
-
     // Password confirmation
     if (password !== confirmPassword) {
       errors.push("Passwords do not match");
     }
 
-    // Phone number validation (E.164 format)
-    const phoneRegex = /^\+1\d{10}$/;
+    // Phone number validation (10 digits)
+    const phoneRegex = /^\d{10}$/;
     if (!phoneNumber || !phoneRegex.test(phoneNumber)) {
-      errors.push("Phone number must be in format +1XXXXXXXXXX");
+      errors.push("Phone number must be 10 digits");
     }
 
-    // Postal code validation
-    if (!postalCode || !/^\d{5}(-\d{4})?$/.test(postalCode)) {
-      errors.push("Postal code must be 5 digits or ZIP+4 format");
+    // Postal code validation (ZIP or ZIP+4)
+    const postalCodeRegex = /^\d{5}(-\d{4})?$/;
+    if (!postalCode || !postalCodeRegex.test(postalCode)) {
+      errors.push(
+        "Postal code must be 5 digits or ZIP+4 format (12345 or 12345-6789)",
+      );
     }
-
-    // Required field validation
-    if (!firstName) errors.push("First name is required");
-    if (!lastName) errors.push("Last name is required");
-    if (!streetAddress) errors.push("Street address is required");
-    if (!city) errors.push("City is required");
-    if (!stateOrTerritory) errors.push("State is required");
 
     return errors;
   };
@@ -92,23 +81,23 @@ export default function SignupPage() {
       }
 
       // POST user to database
-      const response = await fetch("/api/users", {
+      const response = await fetch("/api/users/onboard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          auth_user_id: authData.user?.id,
           username,
-          email,
           first_name: firstName,
           last_name: lastName,
-          phone_number: phoneNumber,
+          email,
+          phone_number: `+1${phoneNumber}`,
           street_address: streetAddress,
           address_line_2: addressLine2 || null,
           city,
           state_or_territory: stateOrTerritory,
           postal_code: postalCode,
+          country: "USA",
           role: "customer",
         }),
       });
@@ -141,7 +130,6 @@ export default function SignupPage() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
-            placeholder="johndoe"
           />
         </div>
         <div className="space-y-1">
@@ -155,7 +143,6 @@ export default function SignupPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            placeholder="you@example.com"
           />
         </div>
         <div className="space-y-1">
@@ -221,7 +208,7 @@ export default function SignupPage() {
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
             required
-            placeholder="+15551234567"
+            placeholder="5551234567"
           />
         </div>
         <div className="space-y-1">
@@ -234,7 +221,6 @@ export default function SignupPage() {
             type="text"
             value={streetAddress}
             onChange={(e) => setStreetAddress(e.target.value)}
-            placeholder="123 Main St"
             required
           />
         </div>
@@ -248,7 +234,6 @@ export default function SignupPage() {
             type="text"
             value={addressLine2}
             onChange={(e) => setAddressLine2(e.target.value)}
-            placeholder="Apt 4B"
           />
         </div>
         <div className="space-y-1">
@@ -261,7 +246,6 @@ export default function SignupPage() {
             type="text"
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            placeholder="San Francisco"
             required
           />
         </div>
