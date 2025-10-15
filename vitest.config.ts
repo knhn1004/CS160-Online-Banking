@@ -1,6 +1,8 @@
 import { defineConfig } from "vitest/config";
+import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
+  plugins: [tsconfigPaths()],
   test: {
     environment: "jsdom",
     globals: true,
@@ -10,11 +12,6 @@ export default defineConfig({
       reporter: ["text", "lcov", "html"],
       reportsDirectory: "./coverage",
       include: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}"],
-    },
-  },
-  resolve: {
-    alias: {
-      "@": new URL("./", import.meta.url).pathname,
     },
   },
 });

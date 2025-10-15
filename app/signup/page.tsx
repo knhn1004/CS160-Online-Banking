@@ -36,14 +36,17 @@ export default function SignupPage() {
     }
 
     // Phone number validation (10 digits)
-    const phoneRegex = /^\d{10}$/;
-    if (!phoneNumber || !phoneRegex.test(phoneNumber)) {
-      errors.push("Phone number must be 10 digits");
+    // Strip all non-digit characters before validation
+    const phoneDigits = phoneNumber.replace(/\D/g, "");
+    if (!phoneNumber || phoneDigits.length !== 10) {
+      errors.push("Phone number must contain exactly 10 digits");
     }
 
     // Postal code validation (ZIP or ZIP+4)
-    const postalCodeRegex = /^\d{5}(-\d{4})?$/;
-    if (!postalCode || !postalCodeRegex.test(postalCode)) {
+    // Strip spaces and validate
+    const cleanedPostalCode = postalCode.replace(/\s/g, "");
+    const postalCodeRegex = /^\d{5}(-?\d{4})?$/;
+    if (!postalCode || !postalCodeRegex.test(cleanedPostalCode)) {
       errors.push(
         "Postal code must be 5 digits or ZIP+4 format (12345 or 12345-6789)",
       );
@@ -81,6 +84,8 @@ export default function SignupPage() {
       }
 
       // POST user to database
+      // Strip non-digit characters from phone number before sending
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, "");
       const response = await fetch("/api/users/onboard", {
         method: "POST",
         headers: {
@@ -91,7 +96,7 @@ export default function SignupPage() {
           first_name: firstName,
           last_name: lastName,
           email,
-          phone_number: `+1${phoneNumber}`,
+          phone_number: `+1${cleanPhoneNumber}`,
           street_address: streetAddress,
           address_line_2: addressLine2 || null,
           city,
@@ -208,7 +213,7 @@ export default function SignupPage() {
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
             required
-            placeholder="5551234567"
+            placeholder="555-123-4567 or (555) 123-4567"
           />
         </div>
         <div className="space-y-1">
