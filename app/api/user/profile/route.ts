@@ -138,7 +138,7 @@ export async function GET(request: Request) {
  *                 user:
  *                   $ref: '#/components/schemas/User'
  *       400:
- *         description: Bad Request - Missing required field or invalid state/territory
+ *         description: Bad Request - Invalid JSON body
  *         content:
  *           application/json:
  *             schema:
@@ -146,7 +146,7 @@ export async function GET(request: Request) {
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Missing required field: first_name"
+ *                   example: "Invalid JSON body"
  *       401:
  *         description: Unauthorized - Invalid or missing authentication token
  *         content:
@@ -167,6 +167,22 @@ export async function GET(request: Request) {
  *                 message:
  *                   type: string
  *                   example: User not onboarded
+ *       422:
+ *         description: Unprocessable Entity - Validation failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Validation failed"
+ *                 errors:
+ *                   type: object
+ *                   description: Field-specific validation errors
+ *                   example:
+ *                     first_name: ["First name is required"]
+ *                     phone_number: ["Phone number must be in E.164 format (+1XXXXXXXXXX)"]
  */
 export async function PUT(request: Request) {
   const auth = await getAuthUserFromRequest(request);
