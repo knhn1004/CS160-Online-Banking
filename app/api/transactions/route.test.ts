@@ -23,7 +23,6 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 import { getAuthUserFromRequest } from "@/lib/auth";
-import { get } from "http";
 
 describe("GET /api/transactions", () => {
   beforeEach(() => {
