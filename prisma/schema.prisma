@@ -147,7 +147,7 @@ model Transaction {
   amount           Decimal               @db.Decimal(19, 4)
   status           TransactionStatusEnum
   transaction_type TransactionTypeEnum
-  check_number     String?               @db.VarChar(12)
+  check_number     String?               @db.VarChar(12) // MICR value (routing number + account number + check number)
 
   // Which internal account moved the money? (source -> OUTBOUND, destination -> INBOUND)
   internal_account_id Int
@@ -159,6 +159,8 @@ model Transaction {
   external_nickname       String? @db.VarChar(30)
 
   direction PaymentDirection
+
+  idempotency_key  String?       @unique
 
   transfer_rule_id Int?
   bill_pay_rule_id Int?
@@ -175,7 +177,6 @@ model Transaction {
 }
 
 enum TransactionStatusEnum {
-  pending
   approved
   denied
 }
@@ -198,7 +199,7 @@ enum TransferKind {
   one_off
 }
 
-// Although our bank supports bi-directional transfers, from the applicationn's perspective, we only handle internal -> internal and internal -> external scheduling.
+// Although our bank supports bi-directional transfers, from the application's perspective, we only handle internal -> internal and internal -> external scheduling.
 model TransferRule {
   id            Int              @id @default(autoincrement())
   user_id       Int
@@ -272,6 +273,7 @@ model BillPayPayee {
   country            String           @default("United States")
   account_number     String           @db.VarChar(17)
   routing_number     String           @db.Char(9)
+  is_active          Boolean          @default(true)
 
   billPayRules BillPayRule[]
 

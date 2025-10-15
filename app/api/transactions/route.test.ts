@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+// Update the import path to the correct location of the route handler
 import { GET } from "./route";
 
 // Mock the Prisma client
