@@ -1,3 +1,4 @@
+import Image from "next/image";
 export default function Page() {
   return (
     <main className="min-h-screen flex flex-col bg-gray-50 font-inter">
@@ -77,7 +78,7 @@ export default function Page() {
 
       {/* Footer */}
       <footer className="py-8 bg-gray-100 text-center text-gray-500 text-sm">
-        © {new Date().getFullYear()} Bank160. All rights reserved.
+        © {new Date().getFullYear()} CS160 Bank. All rights reserved.
       </footer>
     </main>
   );
