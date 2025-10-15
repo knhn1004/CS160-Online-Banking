@@ -42,6 +42,30 @@ pnpm lint
 pnpm format:fix
 ```
 
+7. API Documentation
+
+View docs: http://localhost:3000/api-doc (dev only)
+
+Add docs to new routes:
+
+```typescript
+/**
+ * @swagger
+ * /api/your-route:
+ *   get:
+ *     summary: Brief description
+ *     tags: [YourTag]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success response
+ */
+export async function GET(request: Request) {
+  // your code
+}
+```
+
 Seeded logins (for local testing):
 
 - manager@example.com / Password123!

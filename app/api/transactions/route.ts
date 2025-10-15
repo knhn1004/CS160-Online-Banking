@@ -68,6 +68,45 @@ const TransactionRequestSchema = z.union([
    GET ROUTE - Retrieve Recent Transactions
    ============================================================================================================================ */
 
+/**
+ * @swagger
+ * /api/transactions:
+ *   get:
+ *     summary: Retrieve recent transactions
+ *     description: Retrieves the 10 most recent transactions for all accounts belonging to the authenticated user
+ *     tags:
+ *       - Transactions
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved transactions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 transactions:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Transaction'
+ *       401:
+ *         description: Unauthorized - Invalid or missing authentication token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: User not onboarded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: User not onboarded
+ */
 export async function GET(request: Request) {
   const auth = await getAuthUserFromRequest(request);
   if (!auth.ok) {
@@ -108,6 +147,229 @@ export async function GET(request: Request) {
    POST ROUTE - Create/Process Transaction
    ============================================================================================================================ */
 
+/**
+ * @swagger
+ * /api/transactions:
+ *   post:
+ *     summary: Create and process a transaction
+ *     description: |
+ *       Creates and processes various types of banking transactions. Supports deposits, withdrawals,
+ *       bill payments, internal transfers, and external transfers. Most transaction types require
+ *       authentication except for external inbound transfers.
+ *     tags:
+ *       - Transactions
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: Idempotency-Key
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Optional idempotency key to prevent duplicate transaction processing
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             oneOf:
+ *               - type: object
+ *                 title: Deposit
+ *                 required:
+ *                   - requested_transaction_type
+ *                   - transaction_direction
+ *                   - destination_account_number
+ *                   - requested_amount
+ *                 properties:
+ *                   requested_transaction_type:
+ *                     type: string
+ *                     enum: [deposit]
+ *                   transaction_direction:
+ *                     type: string
+ *                     enum: [inbound]
+ *                   destination_account_number:
+ *                     type: string
+ *                   requested_amount:
+ *                     $ref: '#/components/schemas/Amount'
+ *               - type: object
+ *                 title: Withdrawal
+ *                 required:
+ *                   - requested_transaction_type
+ *                   - transaction_direction
+ *                   - source_account_number
+ *                   - requested_amount
+ *                 properties:
+ *                   requested_transaction_type:
+ *                     type: string
+ *                     enum: [withdrawal]
+ *                   transaction_direction:
+ *                     type: string
+ *                     enum: [outbound]
+ *                   source_account_number:
+ *                     type: string
+ *                   requested_amount:
+ *                     $ref: '#/components/schemas/Amount'
+ *               - type: object
+ *                 title: Bill Pay
+ *                 required:
+ *                   - requested_transaction_type
+ *                   - bill_pay_rule_id
+ *                 properties:
+ *                   requested_transaction_type:
+ *                     type: string
+ *                     enum: [billpay]
+ *                   bill_pay_rule_id:
+ *                     type: integer
+ *               - type: object
+ *                 title: Internal Transfer
+ *                 required:
+ *                   - requested_transaction_type
+ *                   - transfer_rule_id
+ *                 properties:
+ *                   requested_transaction_type:
+ *                     type: string
+ *                     enum: [internal_transfer]
+ *                   transfer_rule_id:
+ *                     type: integer
+ *               - type: object
+ *                 title: External Transfer (Outbound)
+ *                 required:
+ *                   - requested_transaction_type
+ *                   - transfer_rule_id
+ *                 properties:
+ *                   requested_transaction_type:
+ *                     type: string
+ *                     enum: [external_transfer]
+ *                   transfer_rule_id:
+ *                     type: integer
+ *               - type: object
+ *                 title: External Transfer (Inbound)
+ *                 required:
+ *                   - requested_transaction_type
+ *                   - transaction_direction
+ *                   - destination_account_number
+ *                   - source_account_number
+ *                   - source_routing_number
+ *                   - requested_amount
+ *                 properties:
+ *                   requested_transaction_type:
+ *                     type: string
+ *                     enum: [external_transfer]
+ *                   transaction_direction:
+ *                     type: string
+ *                     enum: [inbound]
+ *                   destination_account_number:
+ *                     type: string
+ *                   source_account_number:
+ *                     type: string
+ *                   source_routing_number:
+ *                     type: string
+ *                   requested_amount:
+ *                     $ref: '#/components/schemas/Amount'
+ *           examples:
+ *             deposit:
+ *               summary: Deposit transaction
+ *               value:
+ *                 requested_transaction_type: deposit
+ *                 transaction_direction: inbound
+ *                 destination_account_number: "1234567890"
+ *                 requested_amount: 10000
+ *             withdrawal:
+ *               summary: Withdrawal transaction
+ *               value:
+ *                 requested_transaction_type: withdrawal
+ *                 transaction_direction: outbound
+ *                 source_account_number: "1234567890"
+ *                 requested_amount: 5000
+ *             billpay:
+ *               summary: Bill payment transaction
+ *               value:
+ *                 requested_transaction_type: billpay
+ *                 bill_pay_rule_id: 1
+ *             internal_transfer:
+ *               summary: Internal transfer transaction
+ *               value:
+ *                 requested_transaction_type: internal_transfer
+ *                 transfer_rule_id: 1
+ *             external_outbound:
+ *               summary: External outbound transfer
+ *               value:
+ *                 requested_transaction_type: external_transfer
+ *                 transfer_rule_id: 2
+ *             external_inbound:
+ *               summary: External inbound transfer
+ *               value:
+ *                 requested_transaction_type: external_transfer
+ *                 transaction_direction: inbound
+ *                 destination_account_number: "1234567890"
+ *                 source_account_number: "0987654321"
+ *                 source_routing_number: "021000021"
+ *                 requested_amount: 15000
+ *     responses:
+ *       200:
+ *         description: Transaction processed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: Deposit successful.
+ *       400:
+ *         description: Invalid JSON body
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized - Invalid or missing authentication token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Forbidden - Account is inactive or payee is inactive
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Account, rule, or user not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       409:
+ *         description: Conflict - Insufficient funds
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       422:
+ *         description: Unprocessable Entity - Invalid request body schema
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                 details:
+ *                   type: object
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       502:
+ *         description: Bad Gateway - External payment failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 export async function POST(request: Request) {
   try {
     // Parse and validate request body
