@@ -95,6 +95,8 @@ jobs:
             ${{ runner.os }}-pnpm-store-
       - name: Install deps
         run: pnpm install --frozen-lockfile
+      - name: Prisma generate
+        run: pnpm run -s prisma:generate
       - name: Tests
         run: pnpm run -s test
       - name: Upload coverage
