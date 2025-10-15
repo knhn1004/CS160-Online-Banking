@@ -1,6 +1,10 @@
 import { getPrisma } from "@/app/lib/prisma";
 import { getAuthUserFromRequest } from "@/lib/auth";
 
+// Configure route segment - transactions should be dynamic
+export const dynamic = "force-dynamic";
+export const revalidate = 0; // Don't cache for real-time transaction data
+
 export async function GET(request: Request) {
   const auth = await getAuthUserFromRequest(request);
   if (!auth.ok) {
@@ -36,7 +40,10 @@ export async function GET(request: Request) {
     take: 10,
   });
   return new Response(JSON.stringify({ transactions }), {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "private, no-cache, no-store, must-revalidate",
+    },
   });
 }
 
