@@ -1,7 +1,7 @@
 import { getPrisma } from "@/app/lib/prisma";
 import { getAuthUserFromRequest } from "@/lib/auth";
 
-export async function GET(request: Request) {
+export async function getRecentTransactionHistory(request: Request) {
   const auth = await getAuthUserFromRequest(request);
   if (!auth.ok) {
     return new Response(JSON.stringify(auth.body), {
