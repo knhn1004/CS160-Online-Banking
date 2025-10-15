@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 // Update the import path to the correct location of the route handler
-import { getRecentTransactionHistory } from "./route";
+import { GET } from "./route";
 
 // Mock the Prisma client
 const mockPrisma = {
@@ -38,7 +38,7 @@ describe("GET /api/transactions", () => {
     } as never);
 
     const request = new Request("http://localhost:3000/api/transactions");
-    const response = await getRecentTransactionHistory(request);
+    const response = await GET(request);
     const data = (await response.json()) as { message: string };
 
     expect(response.status).toBe(401);
@@ -54,7 +54,7 @@ describe("GET /api/transactions", () => {
     mockPrisma.user.findUnique.mockResolvedValue(null);
 
     const request = new Request("http://localhost:3000/api/transactions");
-    const response = await getRecentTransactionHistory(request);
+    const response = await GET(request);
     const data = (await response.json()) as { message: string };
 
     expect(response.status).toBe(404);
@@ -98,7 +98,7 @@ describe("GET /api/transactions", () => {
     mockPrisma.transaction.findMany.mockResolvedValue(mockTransactions);
 
     const request = new Request("http://localhost:3000/api/transactions");
-    const response = await getRecentTransactionHistory(request);
+    const response = await GET(request);
     const data = (await response.json()) as {
       transactions: typeof mockTransactions;
     };
@@ -136,7 +136,7 @@ describe("GET /api/transactions", () => {
     mockPrisma.transaction.findMany.mockResolvedValue([]);
 
     const request = new Request("http://localhost:3000/api/transactions");
-    await getRecentTransactionHistory(request);
+    await GET(request);
 
     // Ensure transactions are filtered by account IDs
     expect(mockPrisma.transaction.findMany).toHaveBeenCalledWith(
@@ -166,7 +166,7 @@ describe("GET /api/transactions", () => {
     mockPrisma.transaction.findMany.mockResolvedValue([]);
 
     const request = new Request("http://localhost:3000/api/transactions");
-    const response = await getRecentTransactionHistory(request);
+    const response = await GET(request);
     const data = (await response.json()) as { transactions: unknown[] };
 
     expect(response.status).toBe(200);
