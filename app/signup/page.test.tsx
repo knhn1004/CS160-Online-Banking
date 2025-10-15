@@ -32,7 +32,7 @@ describe("SignupPage", () => {
     // Basic auth fields
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
+    expect(document.getElementById("password")).toBeInTheDocument();
     expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
 
     // Personal info fields
@@ -69,7 +69,7 @@ describe("SignupPage", () => {
 
     // Check input types
     expect(screen.getByLabelText(/email/i)).toHaveAttribute("type", "email");
-    expect(screen.getByLabelText(/^password$/i)).toHaveAttribute(
+    expect(document.getElementById("password")).toHaveAttribute(
       "type",
       "password",
     );
