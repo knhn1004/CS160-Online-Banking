@@ -1,349 +1,624 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+import { useForm } from "@tanstack/react-form";
 import { createClient } from "@/utils/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { SignupSchema, USStateTerritorySchema } from "@/lib/schemas/user";
+import { z } from "zod";
+
+// Get US states/territories from schema
+const US_STATES = USStateTerritorySchema.options;
 
 export default function SignupPage() {
-  // Form Fields
-
-  // In Create User POST Request
-  const [username, setUsername] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [email, setEmail] = useState("");
-  const [streetAddress, setStreetAddress] = useState("");
-  const [addressLine2, setAddressLine2] = useState("");
-  const [city, setCity] = useState("");
-  const [stateOrTerritory, setStateOrTerritory] = useState("");
-  const [postalCode, setPostalCode] = useState("");
-
-  // Password Fields
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const validateForm = () => {
-    const errors: string[] = [];
-
-    // Password confirmation
-    if (password !== confirmPassword) {
-      errors.push("Passwords do not match");
-    }
-
-    // Phone number validation (10 digits)
-    // Strip all non-digit characters before validation
-    const phoneDigits = phoneNumber.replace(/\D/g, "");
-    if (!phoneNumber || phoneDigits.length !== 10) {
-      errors.push("Phone number must contain exactly 10 digits");
-    }
-
-    // Postal code validation (ZIP or ZIP+4)
-    // Strip spaces and validate
-    const cleanedPostalCode = postalCode.replace(/\s/g, "");
-    const postalCodeRegex = /^\d{5}(-?\d{4})?$/;
-    if (!postalCode || !postalCodeRegex.test(cleanedPostalCode)) {
-      errors.push(
-        "Postal code must be 5 digits or ZIP+4 format (12345 or 12345-6789)",
-      );
-    }
-
-    return errors;
-  };
-
-  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    // Validate form
-    const validationErrors = validateForm();
-    if (validationErrors.length > 0) {
-      setError(validationErrors.join(", "));
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const supabase = createClient();
-
-      // Create auth user with Supabase
-      const { error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (authError) {
-        console.log(authError.message);
-        setError(authError.message);
+  const form = useForm({
+    defaultValues: {
+      username: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      firstName: "",
+      lastName: "",
+      phoneNumber: "",
+      streetAddress: "",
+      addressLine2: "",
+      city: "",
+      stateOrTerritory: "" as
+        | ""
+        | "AL"
+        | "AK"
+        | "AZ"
+        | "AR"
+        | "CA"
+        | "CO"
+        | "CT"
+        | "DE"
+        | "DC"
+        | "FL"
+        | "GA"
+        | "HI"
+        | "ID"
+        | "IL"
+        | "IN"
+        | "IA"
+        | "KS"
+        | "KY"
+        | "LA"
+        | "ME"
+        | "MD"
+        | "MA"
+        | "MI"
+        | "MN"
+        | "MS"
+        | "MO"
+        | "MT"
+        | "NE"
+        | "NV"
+        | "NH"
+        | "NJ"
+        | "NM"
+        | "NY"
+        | "NC"
+        | "ND"
+        | "OH"
+        | "OK"
+        | "OR"
+        | "PA"
+        | "RI"
+        | "SC"
+        | "SD"
+        | "TN"
+        | "TX"
+        | "UT"
+        | "VT"
+        | "VA"
+        | "WA"
+        | "WV"
+        | "WI"
+        | "WY"
+        | "PR"
+        | "GU"
+        | "VI"
+        | "AS"
+        | "MP",
+      postalCode: "",
+    },
+    onSubmit: async ({ value }) => {
+      // Validate with Zod
+      const result = SignupSchema.safeParse(value);
+      if (!result.success) {
+        const firstError = result.error.issues[0];
+        setError(firstError?.message || "Validation failed");
         return;
       }
 
-      // POST user to database
-      // Strip non-digit characters from phone number before sending
-      const cleanPhoneNumber = phoneNumber.replace(/\D/g, "");
-      const response = await fetch("/api/users/onboard", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username,
-          first_name: firstName,
-          last_name: lastName,
-          email,
-          phone_number: `+1${cleanPhoneNumber}`,
-          street_address: streetAddress,
-          address_line_2: addressLine2 || null,
-          city,
-          state_or_territory: stateOrTerritory,
-          postal_code: postalCode,
-          country: "USA",
-          role: "customer",
-        }),
-      });
+      setLoading(true);
+      setError(null);
 
-      if (!response.ok) {
-        const errorData = (await response.json()) as { message?: string };
-        throw new Error(errorData.message || "Failed to create user profile");
+      try {
+        const supabase = createClient();
+
+        // Create auth user with Supabase
+        const { error: authError } = await supabase.auth.signUp({
+          email: value.email,
+          password: value.password,
+        });
+
+        if (authError) {
+          console.log(authError.message);
+          setError(authError.message);
+          return;
+        }
+
+        // POST user to database
+        // Strip non-digit characters from phone number before sending
+        const cleanPhoneNumber = value.phoneNumber.replace(/\D/g, "");
+        const response = await fetch("/api/users/onboard", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            username: value.username,
+            first_name: value.firstName,
+            last_name: value.lastName,
+            email: value.email,
+            phone_number: `+1${cleanPhoneNumber}`,
+            street_address: value.streetAddress,
+            address_line_2: value.addressLine2 || null,
+            city: value.city,
+            state_or_territory: value.stateOrTerritory,
+            postal_code: value.postalCode,
+            country: "USA",
+            role: "customer",
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = (await response.json()) as { message?: string };
+          throw new Error(errorData.message || "Failed to create user profile");
+        }
+
+        // Redirect on success
+        window.location.assign("/");
+      } catch (error) {
+        setError(error instanceof Error ? error.message : "An error occurred");
+      } finally {
+        setLoading(false);
       }
-
-      // Redirect on success
-      window.location.assign("/");
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "An error occurred");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
   return (
     <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
-        <div className="space-y-1">
-          <label htmlFor="username" className="text-sm font-medium">
-            Username
-            <span className="text-red-500 text-xs ml-1">*</span>
-          </label>
-          <Input
-            id="username"
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="email" className="text-sm font-medium">
-            Email
-            <span className="text-red-500 text-xs ml-1">*</span>
-          </label>
-          <Input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="password" className="text-sm font-medium">
-            Password
-            <span className="text-red-500 text-xs ml-1">*</span>
-          </label>
-          <Input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="confirmPassword" className="text-sm font-medium">
-            Confirm Password
-            <span className="text-red-500 text-xs ml-1">*</span>
-          </label>
-          <Input
-            id="confirmPassword"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="firstName" className="text-sm font-medium">
-            First Name
-            <span className="text-red-500 text-xs ml-1">*</span>
-          </label>
-          <Input
-            id="firstName"
-            type="text"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="lastName" className="text-sm font-medium">
-            Last Name
-            <span className="text-red-500 text-xs ml-1">*</span>
-          </label>
-          <Input
-            id="lastName"
-            type="text"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="phoneNumber" className="text-sm font-medium">
-            Phone Number
-            <span className="text-red-500 text-xs ml-1">*</span>
-          </label>
-          <Input
-            id="phoneNumber"
-            type="tel"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            required
-            placeholder="555-123-4567 or (555) 123-4567"
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="streetAddress" className="text-sm font-medium">
-            Street Address
-            <span className="text-red-500 text-xs ml-1">*</span>
-          </label>
-          <Input
-            id="streetAddress"
-            type="text"
-            value={streetAddress}
-            onChange={(e) => setStreetAddress(e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="addressLine2" className="text-sm font-medium">
-            Address Line 2
-            <span className="text-gray-500 text-xs ml-1">(optional)</span>
-          </label>
-          <Input
-            id="addressLine2"
-            type="text"
-            value={addressLine2}
-            onChange={(e) => setAddressLine2(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="city" className="text-sm font-medium">
-            City
-            <span className="text-red-500 text-xs ml-1">*</span>
-          </label>
-          <Input
-            id="city"
-            type="text"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="stateOrTerritory" className="text-sm font-medium">
-            State/Territory
-            <span className="text-red-500 text-xs ml-1">*</span>
-          </label>
-          <select
-            id="stateOrTerritory"
-            value={stateOrTerritory}
-            onChange={(e) => setStateOrTerritory(e.target.value)}
-            required
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Select State/Territory</option>
-            <option value="AL">Alabama</option>
-            <option value="AK">Alaska</option>
-            <option value="AZ">Arizona</option>
-            <option value="AR">Arkansas</option>
-            <option value="CA">California</option>
-            <option value="CO">Colorado</option>
-            <option value="CT">Connecticut</option>
-            <option value="DE">Delaware</option>
-            <option value="DC">District of Columbia</option>
-            <option value="FL">Florida</option>
-            <option value="GA">Georgia</option>
-            <option value="HI">Hawaii</option>
-            <option value="ID">Idaho</option>
-            <option value="IL">Illinois</option>
-            <option value="IN">Indiana</option>
-            <option value="IA">Iowa</option>
-            <option value="KS">Kansas</option>
-            <option value="KY">Kentucky</option>
-            <option value="LA">Louisiana</option>
-            <option value="ME">Maine</option>
-            <option value="MD">Maryland</option>
-            <option value="MA">Massachusetts</option>
-            <option value="MI">Michigan</option>
-            <option value="MN">Minnesota</option>
-            <option value="MS">Mississippi</option>
-            <option value="MO">Missouri</option>
-            <option value="MT">Montana</option>
-            <option value="NE">Nebraska</option>
-            <option value="NV">Nevada</option>
-            <option value="NH">New Hampshire</option>
-            <option value="NJ">New Jersey</option>
-            <option value="NM">New Mexico</option>
-            <option value="NY">New York</option>
-            <option value="NC">North Carolina</option>
-            <option value="ND">North Dakota</option>
-            <option value="OH">Ohio</option>
-            <option value="OK">Oklahoma</option>
-            <option value="OR">Oregon</option>
-            <option value="PA">Pennsylvania</option>
-            <option value="RI">Rhode Island</option>
-            <option value="SC">South Carolina</option>
-            <option value="SD">South Dakota</option>
-            <option value="TN">Tennessee</option>
-            <option value="TX">Texas</option>
-            <option value="UT">Utah</option>
-            <option value="VT">Vermont</option>
-            <option value="VA">Virginia</option>
-            <option value="WA">Washington</option>
-            <option value="WV">West Virginia</option>
-            <option value="WI">Wisconsin</option>
-            <option value="WY">Wyoming</option>
-            <option value="PR">Puerto Rico</option>
-            <option value="GU">Guam</option>
-            <option value="VI">Virgin Islands</option>
-            <option value="AS">American Samoa</option>
-            <option value="MP">Northern Mariana Islands</option>
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="postalCode" className="text-sm font-medium">
-            Postal Code
-            <span className="text-red-500 text-xs ml-1">*</span>
-          </label>
-          <Input
-            id="postalCode"
-            type="text"
-            value={postalCode}
-            onChange={(e) => setPostalCode(e.target.value)}
-            required
-            placeholder="12345 or 12345-6789"
-            maxLength={10}
-          />
-        </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="w-full max-w-sm space-y-4"
+      >
+        <form.Field
+          name="username"
+          validators={{
+            onChange: ({ value }) => {
+              const result = z
+                .string()
+                .min(3, "Username must be at least 3 characters")
+                .safeParse(value);
+              return result.success
+                ? undefined
+                : result.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="username" className="text-sm font-medium">
+                Username
+                <span className="text-red-500 text-xs ml-1">*</span>
+              </label>
+              <Input
+                id="username"
+                type="text"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                required
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-sm text-red-600">
+                  {field.state.meta.errors[0]}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field
+          name="email"
+          validators={{
+            onChange: ({ value }) => {
+              const result = z
+                .string()
+                .email("Invalid email address")
+                .safeParse(value);
+              return result.success
+                ? undefined
+                : result.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="email" className="text-sm font-medium">
+                Email
+                <span className="text-red-500 text-xs ml-1">*</span>
+              </label>
+              <Input
+                id="email"
+                type="email"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                required
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-sm text-red-600">
+                  {field.state.meta.errors[0]}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field
+          name="password"
+          validators={{
+            onChange: ({ value }) => {
+              const result = z
+                .string()
+                .min(8, "Password must be at least 8 characters")
+                .regex(
+                  /[A-Z]/,
+                  "Password must contain at least one uppercase letter",
+                )
+                .regex(
+                  /[a-z]/,
+                  "Password must contain at least one lowercase letter",
+                )
+                .regex(/[0-9]/, "Password must contain at least one number")
+                .safeParse(value);
+              return result.success
+                ? undefined
+                : result.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="password" className="text-sm font-medium">
+                Password
+                <span className="text-red-500 text-xs ml-1">*</span>
+              </label>
+              <Input
+                id="password"
+                type="password"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                required
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-sm text-red-600">
+                  {field.state.meta.errors[0]}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field
+          name="confirmPassword"
+          validators={{
+            onChangeListenTo: ["password"],
+            onChange: ({ value, fieldApi }) => {
+              const password = fieldApi.form.getFieldValue("password");
+              if (value !== password) {
+                return "Passwords do not match";
+              }
+              return undefined;
+            },
+          }}
+        >
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="confirmPassword" className="text-sm font-medium">
+                Confirm Password
+                <span className="text-red-500 text-xs ml-1">*</span>
+              </label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                required
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-sm text-red-600">
+                  {field.state.meta.errors[0]}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field
+          name="firstName"
+          validators={{
+            onChange: ({ value }) => {
+              const result = z
+                .string()
+                .min(1, "First name is required")
+                .safeParse(value);
+              return result.success
+                ? undefined
+                : result.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="firstName" className="text-sm font-medium">
+                First Name
+                <span className="text-red-500 text-xs ml-1">*</span>
+              </label>
+              <Input
+                id="firstName"
+                type="text"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                required
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-sm text-red-600">
+                  {field.state.meta.errors[0]}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field
+          name="lastName"
+          validators={{
+            onChange: ({ value }) => {
+              const result = z
+                .string()
+                .min(1, "Last name is required")
+                .safeParse(value);
+              return result.success
+                ? undefined
+                : result.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="lastName" className="text-sm font-medium">
+                Last Name
+                <span className="text-red-500 text-xs ml-1">*</span>
+              </label>
+              <Input
+                id="lastName"
+                type="text"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                required
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-sm text-red-600">
+                  {field.state.meta.errors[0]}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field
+          name="phoneNumber"
+          validators={{
+            onChange: ({ value }) => {
+              const result = z
+                .string()
+                .min(10, "Phone number must contain at least 10 digits")
+                .regex(/\d/, "Phone number must contain digits")
+                .safeParse(value);
+              return result.success
+                ? undefined
+                : result.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="phoneNumber" className="text-sm font-medium">
+                Phone Number
+                <span className="text-red-500 text-xs ml-1">*</span>
+              </label>
+              <Input
+                id="phoneNumber"
+                type="tel"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                required
+                placeholder="(555) 123-4567 or 555-123-4567"
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-sm text-red-600">
+                  {field.state.meta.errors[0]}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field
+          name="streetAddress"
+          validators={{
+            onChange: ({ value }) => {
+              const result = z
+                .string()
+                .min(1, "Street address is required")
+                .safeParse(value);
+              return result.success
+                ? undefined
+                : result.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="streetAddress" className="text-sm font-medium">
+                Street Address
+                <span className="text-red-500 text-xs ml-1">*</span>
+              </label>
+              <Input
+                id="streetAddress"
+                type="text"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                required
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-sm text-red-600">
+                  {field.state.meta.errors[0]}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field name="addressLine2">
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="addressLine2" className="text-sm font-medium">
+                Address Line 2
+                <span className="text-gray-500 text-xs ml-1">(optional)</span>
+              </label>
+              <Input
+                id="addressLine2"
+                type="text"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field
+          name="city"
+          validators={{
+            onChange: ({ value }) => {
+              const result = z
+                .string()
+                .min(1, "City is required")
+                .safeParse(value);
+              return result.success
+                ? undefined
+                : result.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="city" className="text-sm font-medium">
+                City
+                <span className="text-red-500 text-xs ml-1">*</span>
+              </label>
+              <Input
+                id="city"
+                type="text"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                required
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-sm text-red-600">
+                  {field.state.meta.errors[0]}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field
+          name="stateOrTerritory"
+          validators={{
+            onChange: ({ value }) => {
+              if (!value) {
+                return "State/Territory is required";
+              }
+              return undefined;
+            },
+          }}
+        >
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="stateOrTerritory" className="text-sm font-medium">
+                State/Territory
+                <span className="text-red-500 text-xs ml-1">*</span>
+              </label>
+              <select
+                id="stateOrTerritory"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) =>
+                  field.handleChange(e.target.value as typeof field.state.value)
+                }
+                required
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select State/Territory</option>
+                {US_STATES.map((state) => (
+                  <option key={state} value={state}>
+                    {state}
+                  </option>
+                ))}
+              </select>
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-sm text-red-600">
+                  {field.state.meta.errors[0]}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field
+          name="postalCode"
+          validators={{
+            onChange: ({ value }) => {
+              const result = z
+                .string()
+                .regex(
+                  /^\d{5}(-?\d{4})?$/,
+                  "Postal code must be 5 digits or ZIP+4 format",
+                )
+                .safeParse(value);
+              return result.success
+                ? undefined
+                : result.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <div className="space-y-1">
+              <label htmlFor="postalCode" className="text-sm font-medium">
+                Postal Code
+                <span className="text-red-500 text-xs ml-1">*</span>
+              </label>
+              <Input
+                id="postalCode"
+                type="text"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                required
+                placeholder="12345 or 12345-6789"
+                maxLength={10}
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-sm text-red-600">
+                  {field.state.meta.errors[0]}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <Button type="submit" disabled={loading} className="w-full">
           {loading ? "Signing up..." : "Sign up"}
         </Button>
+        <p className="text-center text-sm text-muted-foreground">
+          Already have an account?{" "}
+          <a href="/login" className="text-primary hover:underline font-medium">
+            Log in
+          </a>
+        </p>
       </form>
     </div>
   );

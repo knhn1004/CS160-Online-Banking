@@ -1,7 +1,7 @@
 import { getPrisma } from "@/app/lib/prisma";
 import { getAuthUserFromRequest } from "@/lib/auth";
-import { USStateTerritory } from "@prisma/client";
 import { revalidatePath, revalidateTag } from "next/cache";
+import { UpdateProfileSchema } from "@/lib/schemas/user";
 
 // Configure route segment
 export const dynamic = "force-dynamic"; // Always fetch fresh data
@@ -188,58 +188,45 @@ export async function PUT(request: Request) {
     });
   }
 
-  const body = (await request.json()) as Record<string, unknown>;
-
-  // Validate required fields
-  const requiredFields = [
-    "first_name",
-    "last_name",
-    "phone_number",
-    "street_address",
-    "city",
-    "state_or_territory",
-    "postal_code",
-  ];
-
-  for (const field of requiredFields) {
-    if (!body[field]) {
-      return new Response(
-        JSON.stringify({ message: `Missing required field: ${field}` }),
-        {
-          headers: { "Content-Type": "application/json" },
-          status: 400,
-        },
-      );
-    }
+  // Parse and validate request body with Zod
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ message: "Invalid JSON body" }), {
+      headers: { "Content-Type": "application/json" },
+      status: 400,
+    });
   }
 
-  // Validate state_or_territory is a valid enum value
-  if (
-    !Object.values(USStateTerritory).includes(
-      body.state_or_territory as USStateTerritory,
-    )
-  ) {
+  const parseResult = UpdateProfileSchema.safeParse(body);
+  if (!parseResult.success) {
     return new Response(
-      JSON.stringify({ message: "Invalid state or territory" }),
+      JSON.stringify({
+        message: "Validation failed",
+        errors: parseResult.error.flatten().fieldErrors,
+      }),
       {
         headers: { "Content-Type": "application/json" },
-        status: 400,
+        status: 422,
       },
     );
   }
+
+  const validatedData = parseResult.data;
 
   // Update user
   const updatedUser = await getPrisma().user.update({
     where: { id: currentUser.id },
     data: {
-      first_name: body.first_name as string,
-      last_name: body.last_name as string,
-      phone_number: body.phone_number as string,
-      street_address: body.street_address as string,
-      address_line_2: (body.address_line_2 as string | undefined) || null,
-      city: body.city as string,
-      state_or_territory: body.state_or_territory as USStateTerritory,
-      postal_code: body.postal_code as string,
+      first_name: validatedData.first_name,
+      last_name: validatedData.last_name,
+      phone_number: validatedData.phone_number,
+      street_address: validatedData.street_address,
+      address_line_2: validatedData.address_line_2 || null,
+      city: validatedData.city,
+      state_or_territory: validatedData.state_or_territory,
+      postal_code: validatedData.postal_code,
     },
   });
 

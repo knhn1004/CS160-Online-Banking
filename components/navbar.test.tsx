@@ -1,11 +1,213 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 import { Navbar } from "./navbar";
 
+// Create mock functions
+const mockGetUser = vi.fn();
+const mockGetSession = vi.fn();
+const mockOnAuthStateChange = vi.fn();
+
+// Mock dependencies
+vi.mock("@/utils/supabase/client", () => ({
+  createClient: () => ({
+    auth: {
+      getUser: mockGetUser,
+      getSession: mockGetSession,
+      onAuthStateChange: mockOnAuthStateChange,
+    },
+  }),
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: vi.fn(() => "/"),
+}));
+
+vi.mock("./user-menu", () => ({
+  UserMenu: () => <div>User Menu</div>,
+}));
+
+// Mock fetch
+global.fetch = vi.fn();
+
 describe("Navbar", () => {
-  it("renders app brand", async () => {
-    render(await Navbar());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOnAuthStateChange.mockReturnValue({
+      data: { subscription: { unsubscribe: vi.fn() } },
+    });
+  });
+
+  it("renders app brand", () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    render(<Navbar />);
     expect(
       screen.getByRole("link", { name: /CS160 Bank/i }),
     ).toBeInTheDocument();
+  });
+
+  it("renders UserMenu component", () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    render(<Navbar />);
+    expect(screen.getByText("User Menu")).toBeInTheDocument();
+  });
+
+  it("displays Dashboard link for customer role", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "123", email: "test@example.com" } },
+      error: null,
+    });
+
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: "token123",
+          refresh_token: "refresh",
+          expires_in: 3600,
+          expires_at: Date.now() + 3600000,
+          token_type: "bearer",
+          user: {
+            id: "123",
+            email: "test@example.com",
+            aud: "authenticated",
+            role: "authenticated",
+            created_at: new Date().toISOString(),
+          },
+        },
+      },
+      error: null,
+    });
+
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        user: {
+          id: 1,
+          role: "customer",
+          username: "testuser",
+          email: "test@example.com",
+        },
+      }),
+    } as Response);
+
+    render(<Navbar />);
+
+    await waitFor(
+      () => {
+        expect(screen.getByText("Dashboard")).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+
+    // Customer should not see API Docs link
+    expect(screen.queryByText("API Docs")).not.toBeInTheDocument();
+  });
+
+  it("displays Dashboard and API Docs links for bank_manager role", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "123", email: "manager@example.com" } },
+      error: null,
+    });
+
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: "token123",
+          refresh_token: "refresh",
+          expires_in: 3600,
+          expires_at: Date.now() + 3600000,
+          token_type: "bearer",
+          user: {
+            id: "123",
+            email: "manager@example.com",
+            aud: "authenticated",
+            role: "authenticated",
+            created_at: new Date().toISOString(),
+          },
+        },
+      },
+      error: null,
+    });
+
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        user: {
+          id: 1,
+          role: "bank_manager",
+          username: "manager",
+          email: "manager@example.com",
+        },
+      }),
+    } as Response);
+
+    render(<Navbar />);
+
+    await waitFor(
+      () => {
+        expect(screen.getByText("Dashboard")).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+
+    expect(screen.getByText("API Docs")).toBeInTheDocument();
+  });
+
+  it("does not display navigation links when user is not authenticated", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
+      error: null,
+    });
+
+    render(<Navbar />);
+
+    await waitFor(
+      () => {
+        expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+      },
+      { timeout: 1000 },
+    );
+
+    expect(screen.queryByText("API Docs")).not.toBeInTheDocument();
+  });
+
+  it("does not display navigation links when profile fetch fails", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "123", email: "test@example.com" } },
+      error: null,
+    });
+
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: "token123",
+          refresh_token: "refresh",
+          expires_in: 3600,
+          expires_at: Date.now() + 3600000,
+          token_type: "bearer",
+          user: {
+            id: "123",
+            email: "test@example.com",
+            aud: "authenticated",
+            role: "authenticated",
+            created_at: new Date().toISOString(),
+          },
+        },
+      },
+      error: null,
+    });
+
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: false,
+      status: 404,
+    } as Response);
+
+    render(<Navbar />);
+
+    await waitFor(
+      () => {
+        expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+      },
+      { timeout: 1000 },
+    );
   });
 });

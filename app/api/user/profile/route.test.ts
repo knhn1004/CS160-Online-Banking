@@ -144,7 +144,7 @@ describe("PUT /api/user/profile", () => {
     expect(data).toEqual({ message: "User not onboarded" });
   });
 
-  it("returns 400 when required fields are missing", async () => {
+  it("returns 422 when required fields are missing", async () => {
     const mockUser = {
       id: 1,
       auth_user_id: "user-123",
@@ -165,13 +165,17 @@ describe("PUT /api/user/profile", () => {
       }),
     });
     const response = await PUT(request);
-    const data = (await response.json()) as { message: string };
+    const data = (await response.json()) as {
+      message: string;
+      errors: unknown;
+    };
 
-    expect(response.status).toBe(400);
-    expect(data.message).toContain("Missing required field");
+    expect(response.status).toBe(422);
+    expect(data.message).toBe("Validation failed");
+    expect(data.errors).toBeDefined();
   });
 
-  it("returns 400 when state_or_territory is invalid", async () => {
+  it("returns 422 when state_or_territory is invalid", async () => {
     const mockUser = {
       id: 1,
       auth_user_id: "user-123",
@@ -197,10 +201,14 @@ describe("PUT /api/user/profile", () => {
       }),
     });
     const response = await PUT(request);
-    const data = (await response.json()) as { message: string };
+    const data = (await response.json()) as {
+      message: string;
+      errors: unknown;
+    };
 
-    expect(response.status).toBe(400);
-    expect(data.message).toBe("Invalid state or territory");
+    expect(response.status).toBe(422);
+    expect(data.message).toBe("Validation failed");
+    expect(data.errors).toBeDefined();
   });
 
   it("successfully updates user profile", async () => {
