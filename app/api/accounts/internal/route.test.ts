@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { POST } from "./route";
-import { getPrisma } from "@/app/lib/prisma";
 import { getAuthUserFromRequest } from "@/lib/auth";
 
 // Mock the Prisma client
