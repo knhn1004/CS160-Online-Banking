@@ -9,6 +9,7 @@ import type { UserProfile } from "@/lib/auth";
 
 export function Navbar() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
@@ -25,13 +26,17 @@ export function Navbar() {
           data: { user },
         } = await supabase.auth.getUser();
 
+        // Set authentication state based on Supabase auth
+        const isAuth = !!user;
+        setIsAuthenticated(isAuth);
+
         if (!user) {
           setUserProfile(null);
           setLoading(false);
           return;
         }
 
-        // Fetch user profile from API
+        // Fetch user profile from API for role-specific features
         const {
           data: { session },
         } = await supabase.auth.getSession();
@@ -51,6 +56,7 @@ export function Navbar() {
           const data = (await response.json()) as { user: UserProfile };
           setUserProfile(data.user);
         } else {
+          // User is authenticated but profile might not be fully set up
           setUserProfile(null);
         }
       } catch (error) {
@@ -76,13 +82,15 @@ export function Navbar() {
     };
   }, []);
 
-  // Navigation items based on role
+  // Navigation items based on authentication and role
   const getNavItems = () => {
-    if (!userProfile) return [];
+    // Show dashboard for any authenticated user
+    if (!isAuthenticated) return [];
 
     const items = [{ href: "/dashboard", label: "Dashboard" }];
 
-    if (userProfile.role === "bank_manager") {
+    // Add role-specific items if we have the full profile
+    if (userProfile?.role === "bank_manager") {
       items.push({ href: "/api-doc", label: "API Docs" });
     }
 
@@ -119,7 +127,7 @@ export function Navbar() {
         <div className="flex items-center gap-2">
           {mounted &&
             !loading &&
-            !userProfile &&
+            !isAuthenticated &&
             pathname !== "/login" &&
             pathname !== "/signup" && (
               <Link

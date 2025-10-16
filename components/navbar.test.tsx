@@ -170,7 +170,7 @@ describe("Navbar", () => {
     expect(screen.queryByText("API Docs")).not.toBeInTheDocument();
   });
 
-  it("does not display navigation links when profile fetch fails", async () => {
+  it("displays Dashboard link even when profile fetch fails (authenticated user)", async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: "123", email: "test@example.com" } },
       error: null,
@@ -203,9 +203,77 @@ describe("Navbar", () => {
 
     render(<Navbar />);
 
+    // Dashboard should still appear for authenticated users even if profile fetch fails
     await waitFor(
       () => {
-        expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+        expect(screen.getByText("Dashboard")).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+
+    // But role-specific links like API Docs should not appear without profile
+    expect(screen.queryByText("API Docs")).not.toBeInTheDocument();
+  });
+
+  it("displays Sign up link for unauthenticated users", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
+      error: null,
+    });
+
+    render(<Navbar />);
+
+    await waitFor(
+      () => {
+        expect(screen.getByText("Sign up")).toBeInTheDocument();
+      },
+      { timeout: 1000 },
+    );
+  });
+
+  it("does not display Sign up link for authenticated users", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "123", email: "test@example.com" } },
+      error: null,
+    });
+
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: "token123",
+          refresh_token: "refresh",
+          expires_in: 3600,
+          expires_at: Date.now() + 3600000,
+          token_type: "bearer",
+          user: {
+            id: "123",
+            email: "test@example.com",
+            aud: "authenticated",
+            role: "authenticated",
+            created_at: new Date().toISOString(),
+          },
+        },
+      },
+      error: null,
+    });
+
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        user: {
+          id: 1,
+          role: "customer",
+          username: "testuser",
+          email: "test@example.com",
+        },
+      }),
+    } as Response);
+
+    render(<Navbar />);
+
+    await waitFor(
+      () => {
+        expect(screen.queryByText("Sign up")).not.toBeInTheDocument();
       },
       { timeout: 1000 },
     );
