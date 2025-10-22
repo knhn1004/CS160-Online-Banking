@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AccountManagement } from "./account-management";
 import { AtmLocator } from "./atm-locator";
+import { DashboardOverview } from "./dashboard-overview";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -39,11 +40,15 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto py-8">
       <h1 className="mb-6 text-3xl font-bold">Dashboard</h1>
-      <Tabs defaultValue="account" className="w-full">
+      <Tabs defaultValue="overview" className="w-full">
         <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="account">Account Management</TabsTrigger>
           <TabsTrigger value="atm">ATM Near Me</TabsTrigger>
         </TabsList>
+        <TabsContent value="overview">
+          <DashboardOverview />
+        </TabsContent>
         <TabsContent value="account">
           <AccountManagement />
         </TabsContent>
