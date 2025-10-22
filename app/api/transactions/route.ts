@@ -1063,3 +1063,4 @@ async function handleExternalInbound(
     });
   });
 }
+export { Amount };
