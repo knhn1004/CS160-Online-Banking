@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { UsersTable } from "./users-table";
+
+const user = userEvent.setup();
 
 // Mock the actions
 vi.mock("./actions", () => ({
@@ -23,7 +26,14 @@ vi.mock("./user-details-modal", () => ({
     ) : null,
 }));
 
+// Mock the export utilities
+vi.mock("./export-utils", () => ({
+  exportUsersToCSV: vi.fn(),
+  exportUsersToPDF: vi.fn(),
+}));
+
 import { getUsers } from "./actions";
+import * as exportUtils from "./export-utils";
 
 const mockUsers = [
   {
@@ -297,5 +307,49 @@ describe("UsersTable", () => {
     });
 
     consoleSpy.mockRestore();
+  });
+
+  it("should render export button", async () => {
+    render(<UsersTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Export")).toBeInTheDocument();
+    });
+  });
+
+  it("should call exportUsersToCSV when CSV option is clicked", async () => {
+    render(<UsersTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Export")).toBeInTheDocument();
+    });
+
+    // Click the export button to open dropdown
+    const exportButton = screen.getByText("Export");
+    await user.click(exportButton);
+
+    // Click CSV option
+    const csvOption = screen.getByText("Export as CSV");
+    await user.click(csvOption);
+
+    expect(exportUtils.exportUsersToCSV).toHaveBeenCalledWith(mockUsers);
+  });
+
+  it("should call exportUsersToPDF when PDF option is clicked", async () => {
+    render(<UsersTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Export")).toBeInTheDocument();
+    });
+
+    // Click the export button to open dropdown
+    const exportButton = screen.getByText("Export");
+    await user.click(exportButton);
+
+    // Click PDF option
+    const pdfOption = screen.getByText("Export as PDF");
+    await user.click(pdfOption);
+
+    expect(exportUtils.exportUsersToPDF).toHaveBeenCalledWith(mockUsers);
   });
 });
