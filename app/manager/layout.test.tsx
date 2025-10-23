@@ -46,6 +46,10 @@ describe("ManagerLayout", () => {
     vi.mocked(getPrisma).mockReturnValue(
       mockPrisma as unknown as ReturnType<typeof getPrisma>,
     );
+    // Reset notFound mock to default behavior
+    vi.mocked(notFound).mockImplementation(() => {
+      throw new Error("notFound called");
+    });
   });
 
   it("should show 404 when user is not authenticated", async () => {
@@ -54,11 +58,18 @@ describe("ManagerLayout", () => {
       error: null,
     });
 
+    // Mock notFound to throw an error to stop execution
+    vi.mocked(notFound).mockImplementation(() => {
+      throw new Error("notFound called");
+    });
+
     // Check if the mock is working
     const result = await mockSupabase.auth.getUser();
     expect(result.data.user).toBeNull();
 
-    await ManagerLayout({ children: <div>Test</div> });
+    await expect(ManagerLayout({ children: <div>Test</div> })).rejects.toThrow(
+      "notFound called",
+    );
 
     expect(notFound).toHaveBeenCalled();
   });
@@ -72,7 +83,14 @@ describe("ManagerLayout", () => {
       role: "customer",
     });
 
-    await ManagerLayout({ children: <div>Test</div> });
+    // Mock notFound to throw an error to stop execution
+    vi.mocked(notFound).mockImplementation(() => {
+      throw new Error("notFound called");
+    });
+
+    await expect(ManagerLayout({ children: <div>Test</div> })).rejects.toThrow(
+      "notFound called",
+    );
 
     expect(notFound).toHaveBeenCalled();
   });
@@ -84,7 +102,14 @@ describe("ManagerLayout", () => {
     });
     mockPrisma.user.findUnique.mockResolvedValue(null);
 
-    await ManagerLayout({ children: <div>Test</div> });
+    // Mock notFound to throw an error to stop execution
+    vi.mocked(notFound).mockImplementation(() => {
+      throw new Error("notFound called");
+    });
+
+    await expect(ManagerLayout({ children: <div>Test</div> })).rejects.toThrow(
+      "notFound called",
+    );
 
     expect(notFound).toHaveBeenCalled();
   });
@@ -98,6 +123,12 @@ describe("ManagerLayout", () => {
       role: "bank_manager",
       first_name: "John",
       last_name: "Manager",
+    });
+
+    // Mock notFound to do nothing for this test (successful case)
+    vi.mocked(notFound).mockImplementation((): never => {
+      // Do nothing - this should not be called in successful cases
+      throw new Error("This should not be called");
     });
 
     await ManagerLayout({ children: <div>Test Content</div> });
@@ -122,6 +153,12 @@ describe("ManagerLayout", () => {
       last_name: "Manager",
     });
 
+    // Mock notFound to do nothing for this test (successful case)
+    vi.mocked(notFound).mockImplementation((): never => {
+      // Do nothing - this should not be called in successful cases
+      throw new Error("This should not be called");
+    });
+
     await ManagerLayout({ children: <div>Test</div> });
 
     expect(mockSupabase.auth.getUser).toHaveBeenCalled();
@@ -136,6 +173,12 @@ describe("ManagerLayout", () => {
       role: "bank_manager",
       first_name: "John",
       last_name: "Manager",
+    });
+
+    // Mock notFound to do nothing for this test (successful case)
+    vi.mocked(notFound).mockImplementation((): never => {
+      // Do nothing - this should not be called in successful cases
+      throw new Error("This should not be called");
     });
 
     await ManagerLayout({ children: <div>Test</div> });

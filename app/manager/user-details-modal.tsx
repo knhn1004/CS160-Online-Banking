@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -108,11 +109,15 @@ export function UserDetailsModal({
     ) || 0;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>User Details</DialogTitle>
-        </DialogHeader>
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent className="w-full sm:w-[640px] h-full overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>User Details</SheetTitle>
+          <SheetDescription>
+            View detailed information about the selected user including profile,
+            accounts, and recent transactions.
+          </SheetDescription>
+        </SheetHeader>
 
         {loading ? (
           <div className="space-y-4">
@@ -133,7 +138,7 @@ export function UserDetailsModal({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-500">
                       Name
@@ -194,7 +199,7 @@ export function UserDetailsModal({
                 <CardTitle>Account Summary</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                   <div className="text-center">
                     <p className="text-2xl font-bold text-green-600">
                       {formatCurrency(totalBalance)}
@@ -306,7 +311,7 @@ export function UserDetailsModal({
             <p className="text-gray-500">User not found</p>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
