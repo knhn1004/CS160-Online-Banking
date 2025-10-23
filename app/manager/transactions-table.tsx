@@ -21,7 +21,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getTransactions, type ManagerTransaction } from "./actions";
+import {
+  exportTransactionsToCSV,
+  exportTransactionsToPDF,
+} from "./export-utils";
 
 export function TransactionsTable() {
   const [transactions, setTransactions] = useState<ManagerTransaction[]>([]);
@@ -123,12 +133,37 @@ export function TransactionsTable() {
     return direction === "inbound" ? "default" : "secondary";
   };
 
+  const handleExportCSV = () => {
+    exportTransactionsToCSV(transactions);
+  };
+
+  const handleExportPDF = () => {
+    exportTransactionsToPDF(transactions);
+  };
+
   const totalPages = Math.ceil(total / limit);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Transactions</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Transactions</CardTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportCSV}>
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportPDF}>
+                Export as PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         <div className="flex flex-col sm:flex-row gap-4">
           <Input
             placeholder="Search by user name or username..."

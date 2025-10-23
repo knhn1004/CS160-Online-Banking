@@ -37,6 +37,8 @@
     "@vis.gl/react-google-maps": "^1.5.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.544.0",
     "next": "15.4.6",
     "next-swagger-doc": "^0.4.1",
