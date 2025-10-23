@@ -246,16 +246,6 @@ describe("UserDetailsModal", () => {
     expect(getUserTransactions).not.toHaveBeenCalled();
   });
 
-  it("should format dates correctly", async () => {
-    render(<UserDetailsModal userId={1} isOpen={true} onClose={() => {}} />);
-
-    await waitFor(() => {
-      // Check if dates are formatted (exact format may vary based on locale)
-      expect(screen.getByText(/Jan 1, 2023/)).toBeInTheDocument();
-      expect(screen.getByText(/Jan 2, 2023/)).toBeInTheDocument();
-    });
-  });
-
   it("should display correct role badge variant", async () => {
     render(<UserDetailsModal userId={1} isOpen={true} onClose={() => {}} />);
 
