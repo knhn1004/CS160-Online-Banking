@@ -8,7 +8,6 @@ import type {
 } from "@prisma/client";
 
 import {
-  BillPayRule,
   CreateBillPayRule,
   UpdateBillPayRule,
   CreateBillPayRuleType,
@@ -27,9 +26,7 @@ type RuleWithRelations = DBBillPayRule & {
 /* ------------------------------------------------ Verification & Validation Helpers ------------------------------------------------ */
 
 // Function that gets if the user ID.
-export async function getUserIdFromRequest(
-  req: Request,
-): Promise<number | null> {
+async function getUserIdFromRequest(req: Request): Promise<number | null> {
   const auth = await getAuthUserFromRequest(req);
 
   if (!auth?.ok || !auth.supabaseUser?.id) {
@@ -58,9 +55,7 @@ export async function getUserIdFromRequest(
 }
 
 // Function that checks if the payee exists (by getting them via ID).
-export async function getPayeeById(
-  payee_id: number,
-): Promise<BillPayPayee | null> {
+async function getPayeeById(payee_id: number): Promise<BillPayPayee | null> {
   try {
     return await prisma.billPayPayee.findUnique({
       where: { id: payee_id },
@@ -72,7 +67,7 @@ export async function getPayeeById(
 }
 
 // Function that checks if the payee's account is active.
-export async function isPayeeActive(payee_id: number): Promise<boolean> {
+async function isPayeeActive(payee_id: number): Promise<boolean> {
   try {
     const payee = await prisma.billPayPayee.findUnique({
       where: { id: payee_id },
@@ -86,7 +81,7 @@ export async function isPayeeActive(payee_id: number): Promise<boolean> {
 }
 
 // Function that checks if the internal source account exists and is still active.
-export async function isInternalAccountActive(
+async function isInternalAccountActive(
   source_internal_id: number,
 ): Promise<boolean> {
   try {
@@ -102,7 +97,7 @@ export async function isInternalAccountActive(
 }
 
 // Function that checks if the internal source account has sufficient balance.
-export async function hasSufficientBalance(
+async function hasSufficientBalance(
   source_internal_id: number,
   amount: AmountType,
 ): Promise<{ ok: boolean; balance: string | null }> {
