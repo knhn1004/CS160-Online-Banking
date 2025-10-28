@@ -21,8 +21,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getUsers, type ManagerUser } from "./actions";
 import { UserDetailsModal } from "./user-details-modal";
+import { exportUsersToCSV, exportUsersToPDF } from "./export-utils";
 
 export function UsersTable() {
   const [users, setUsers] = useState<ManagerUser[]>([]);
@@ -92,12 +99,37 @@ export function UsersTable() {
     return role === "bank_manager" ? "default" : "secondary";
   };
 
+  const handleExportCSV = () => {
+    exportUsersToCSV(users);
+  };
+
+  const handleExportPDF = () => {
+    exportUsersToPDF(users);
+  };
+
   const totalPages = Math.ceil(total / limit);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Users</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Users</CardTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportCSV}>
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportPDF}>
+                Export as PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         <div className="flex flex-col sm:flex-row gap-4">
           <Input
             placeholder="Search by name, username, or email..."
