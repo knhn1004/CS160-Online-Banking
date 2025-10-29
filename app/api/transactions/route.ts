@@ -423,52 +423,82 @@ export async function POST(request: Request) {
     const prisma = getPrisma();
 
     // Route to appropriate handler
+    let response: Response;
     if (request_body.requested_transaction_type === "deposit") {
-      return await handleDeposit(prisma, request_body, auth, idempotency_key);
-    }
-
-    if (request_body.requested_transaction_type === "withdrawal") {
-      return await handleWithdrawal(
+      response = await handleDeposit(
         prisma,
         request_body,
         auth,
         idempotency_key,
       );
-    }
-
-    if (request_body.requested_transaction_type === "billpay") {
-      return await handleBillPay(prisma, request_body, auth, idempotency_key);
-    }
-
-    if (request_body.requested_transaction_type === "internal_transfer") {
-      return await handleInternalTransfer(
+    } else if (request_body.requested_transaction_type === "withdrawal") {
+      response = await handleWithdrawal(
         prisma,
         request_body,
         auth,
         idempotency_key,
       );
-    }
-
-    if (request_body.requested_transaction_type === "external_transfer") {
+    } else if (request_body.requested_transaction_type === "billpay") {
+      response = await handleBillPay(
+        prisma,
+        request_body,
+        auth,
+        idempotency_key,
+      );
+    } else if (
+      request_body.requested_transaction_type === "internal_transfer"
+    ) {
+      response = await handleInternalTransfer(
+        prisma,
+        request_body,
+        auth,
+        idempotency_key,
+      );
+    } else if (
+      request_body.requested_transaction_type === "external_transfer"
+    ) {
       if ("transfer_rule_id" in request_body) {
-        return await handleExternalOutbound(
+        response = await handleExternalOutbound(
           prisma,
           request_body,
           auth,
           idempotency_key,
         );
       } else {
-        return await handleExternalInbound(
+        response = await handleExternalInbound(
           prisma,
           request_body,
           idempotency_key,
         );
       }
+    } else {
+      return json(500, {
+        error: "Internal Server Error: Unhandled transaction case.",
+      });
     }
 
-    return json(500, {
-      error: "Internal Server Error: Unhandled transaction case.",
-    });
+    // Invalidate cache after successful transaction (200 status)
+    if (response.status === 200 && auth?.ok) {
+      // Get database user ID for cache invalidation
+      const dbUser = await prisma.user.findUnique({
+        where: { auth_user_id: auth.supabaseUser.id },
+        select: { id: true },
+      });
+
+      // Invalidate transactions and accounts cache (balances changed)
+      // Transactions changed, and account balances also changed, so invalidate both
+      const { revalidateTag } = await import("next/cache");
+      await revalidateTag(`user-${auth.supabaseUser.id}`);
+      await revalidateTag(`transactions-${auth.supabaseUser.id}`);
+      await revalidateTag(`accounts-${auth.supabaseUser.id}`);
+      if (dbUser) {
+        await revalidateTag(`user-${dbUser.id}`);
+        await revalidateTag(`transactions-${dbUser.id}`);
+        await revalidateTag(`accounts-${dbUser.id}`);
+      }
+    }
+
+    return response;
   } catch (error) {
     console.error("Error processing transaction:", error);
     return json(500, { error: "Internal Server Error" });

@@ -1,7 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowRight } from "lucide-react";
@@ -34,112 +32,15 @@ interface DashboardData {
 }
 
 interface DashboardOverviewProps {
+  initialData: DashboardData | null;
   onNavigateToAccounts?: () => void;
 }
 
 export function DashboardOverview({
+  initialData,
   onNavigateToAccounts,
 }: DashboardOverviewProps) {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<DashboardData | null>(null);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        setError("Not authenticated");
-        return;
-      }
-
-      // // Fetch accounts from the internal accounts API
-      const accountsResponse = await fetch("/api/accounts/internal", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!accountsResponse.ok) {
-        throw new Error("Failed to fetch accounts");
-      }
-
-      const accountsData = (await accountsResponse.json()) as {
-        accounts: Account[];
-      };
-
-      // mock data until internals accounts GET API is implemented
-      // const mockAccounts: Account[] = [
-      //   {
-      //     id: 1,
-      //     account_number: "12345678901234567",
-      //     routing_number: "12345678901234445",
-      //     account_type: "checking",
-      //     balance: 1000.0,
-      //     is_active: true,
-      //     created_at: "2024-01-01T00:00:00Z",
-      //     updated_at: "2024-01-01T00:00:00Z",
-      //   },
-      //   {
-      //     id: 2,
-      //     account_number: "98765432109876543",
-      //     routing_number: "12345678901234445",
-      //     account_type: "savings",
-      //     balance: 5000.0,
-      //     is_active: true,
-      //     created_at: "2024-01-01T00:00:00Z",
-      //     updated_at: "2024-01-01T00:00:00Z",
-      //   },
-      // ];
-
-      // const accountsData = { accounts: mockAccounts };
-
-      // Fetch recent transactions
-      const transactionsResponse = await fetch("/api/transactions", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!transactionsResponse.ok) {
-        throw new Error("Failed to fetch transactions");
-      }
-
-      const transactionsData = (await transactionsResponse.json()) as {
-        transactions: Transaction[];
-      };
-
-      // Calculate total balance
-      const totalBalance = accountsData.accounts.reduce(
-        (sum: number, account: Account) => sum + account.balance,
-        0,
-      );
-
-      const dashboardData = {
-        accounts: accountsData.accounts ?? [],
-        transactions: transactionsData.transactions ?? [],
-        totalBalance,
-      };
-
-      setData(dashboardData);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load dashboard data",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const data = initialData;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -160,7 +61,7 @@ export function DashboardOverview({
     return `****${accountNumber.slice(-4)}`;
   };
 
-  if (loading) {
+  if (!data) {
     return (
       <div className="space-y-6">
         <div className="grid gap-6 md:grid-cols-2">
@@ -181,27 +82,6 @@ export function DashboardOverview({
             <Skeleton className="h-4 w-1/2" />
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-lg border p-6">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={fetchDashboardData} variant="outline">
-            Try Again
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="rounded-lg border p-6">
-        <p>No data available</p>
       </div>
     );
   }
