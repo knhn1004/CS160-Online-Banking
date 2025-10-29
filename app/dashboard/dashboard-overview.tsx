@@ -57,45 +57,45 @@ export function DashboardOverview() {
       }
 
       // // Fetch accounts from the internal accounts API
-      // const accountsResponse = await fetch("/api/accounts/internal", {
-      //   headers: {
-      //     Authorization: `Bearer ${session.access_token}`,
-      //   },
-      // });
+      const accountsResponse = await fetch("/api/accounts/internal", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
-      // if (!accountsResponse.ok) {
-      //   throw new Error("Failed to fetch accounts");
-      // }
+      if (!accountsResponse.ok) {
+        throw new Error("Failed to fetch accounts");
+      }
 
-      // const accountsData = (await accountsResponse.json()) as {
-      //   accounts: Account[];
-      // };
+      const accountsData = (await accountsResponse.json()) as {
+        accounts: Account[];
+      };
 
       // mock data until internals accounts GET API is implemented
-      const mockAccounts: Account[] = [
-        {
-          id: 1,
-          account_number: "12345678901234567",
-          routing_number: "12345678901234445",
-          account_type: "checking",
-          balance: 1000.0,
-          is_active: true,
-          created_at: "2024-01-01T00:00:00Z",
-          updated_at: "2024-01-01T00:00:00Z",
-        },
-        {
-          id: 2,
-          account_number: "98765432109876543",
-          routing_number: "12345678901234445",
-          account_type: "savings",
-          balance: 5000.0,
-          is_active: true,
-          created_at: "2024-01-01T00:00:00Z",
-          updated_at: "2024-01-01T00:00:00Z",
-        },
-      ];
+      // const mockAccounts: Account[] = [
+      //   {
+      //     id: 1,
+      //     account_number: "12345678901234567",
+      //     routing_number: "12345678901234445",
+      //     account_type: "checking",
+      //     balance: 1000.0,
+      //     is_active: true,
+      //     created_at: "2024-01-01T00:00:00Z",
+      //     updated_at: "2024-01-01T00:00:00Z",
+      //   },
+      //   {
+      //     id: 2,
+      //     account_number: "98765432109876543",
+      //     routing_number: "12345678901234445",
+      //     account_type: "savings",
+      //     balance: 5000.0,
+      //     is_active: true,
+      //     created_at: "2024-01-01T00:00:00Z",
+      //     updated_at: "2024-01-01T00:00:00Z",
+      //   },
+      // ];
 
-      const accountsData = { accounts: mockAccounts };
+      // const accountsData = { accounts: mockAccounts };
 
       // Fetch recent transactions
       const transactionsResponse = await fetch("/api/transactions", {
@@ -119,8 +119,8 @@ export function DashboardOverview() {
       );
 
       const dashboardData = {
-        accounts: accountsData.accounts,
-        transactions: transactionsData.transactions,
+        accounts: accountsData.accounts ?? [],
+        transactions: transactionsData.transactions ?? [],
         totalBalance,
       };
 
