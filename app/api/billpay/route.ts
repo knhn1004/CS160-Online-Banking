@@ -66,20 +66,6 @@ async function getPayeeById(payee_id: number): Promise<BillPayPayee | null> {
   }
 }
 
-// Function that checks if the payee's account is active.
-async function isPayeeActive(payee_id: number): Promise<boolean> {
-  try {
-    const payee = await prisma.billPayPayee.findUnique({
-      where: { id: payee_id },
-      select: { id: true, is_active: true },
-    });
-    return !!payee; // Explicit boolean coercion.
-  } catch (err: unknown) {
-    console.error("isPayeeActive error", err);
-    return false;
-  }
-}
-
 // Function that checks if the internal source account exists and is still active.
 async function isInternalAccountActive(
   source_internal_id: number,
@@ -93,41 +79,6 @@ async function isInternalAccountActive(
   } catch (err: unknown) {
     console.error("isInternalAccountActive error", err);
     return false;
-  }
-}
-
-// Function that checks if the internal source account has sufficient balance.
-async function hasSufficientBalance(
-  source_internal_id: number,
-  amount: AmountType,
-): Promise<{ ok: boolean; balance: string | null }> {
-  try {
-    type AccountBalanceRow = {
-      balance: Prisma.Decimal | number | string | null;
-    };
-    const account = (await prisma.internalAccount.findUnique({
-      where: { id: source_internal_id },
-      select: { balance: true },
-    })) as AccountBalanceRow | null;
-
-    if (!account || account.balance == null) {
-      return {
-        ok: false,
-        balance: null,
-      };
-    }
-
-    // Coerce payment amount to a decimal.
-    const requested_amount = new Prisma.Decimal(String(amount));
-    const current_balance = new Prisma.Decimal(String(account.balance));
-
-    const ok = current_balance.gte(requested_amount);
-
-    // Return the balance as a string to preserve precision.
-    return { ok, balance: current_balance.toString() };
-  } catch (err: unknown) {
-    console.error("hasSufficientBalance error", err);
-    return { ok: false, balance: null };
   }
 }
 
@@ -192,6 +143,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // Ensure payee is active:
+    if (!payee.is_active) {
+      return new Response(
+        JSON.stringify({
+          error: "Payee is inactive.",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const active_account = await isInternalAccountActive(
       data.source_internal_id,
     );
@@ -245,10 +209,24 @@ export async function POST(request: Request) {
       );
     }
 
+    // Need to ensure that the customer chooses a start time in the future!
+    if (parsed_start.getTime() < Date.now()) {
+      return new Response(
+        JSON.stringify({
+          error: "The bill pay rule start time is invalid.",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const initial_next_run = computeNextRunFromStart(
       data.start_time,
       data.frequency,
     );
+
     const bill_pay_rule = await prisma.billPayRule.create({
       data: {
         user_id: data.user_id,
