@@ -1,9 +1,45 @@
 import { getPrisma } from "@/app/lib/prisma";
 import { getAuthUserFromRequest } from "@/lib/auth";
+// import { InternalAccountResponseSchema } from "@/lib/schemas/transfer";
 
 /**
  * @swagger
  * /api/accounts/internal:
+ *   get:
+ *     summary: Get user's internal accounts
+ *     description: Retrieves all internal accounts for the authenticated user with balances
+ *     tags:
+ *       - Accounts
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved accounts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accounts:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       account_number:
+ *                         type: string
+ *                       account_type:
+ *                         type: string
+ *                         enum: [checking, savings]
+ *                       balance:
+ *                         type: number
+ *                       is_active:
+ *                         type: boolean
+ *       401:
+ *         description: Unauthorized - Invalid or missing authentication token
+ *       404:
+ *         description: User not onboarded
  *   post:
  *     summary: Create internal bank account
  *     description: Creates a new checking or savings account for the authenticated user
@@ -112,6 +148,51 @@ async function generateUniqueAccountNumber(): Promise<string> {
   throw new Error(
     "Failed to generate unique account number after multiple attempts",
   );
+}
+
+export async function GET(request: Request) {
+  // Auth check
+  const auth = await getAuthUserFromRequest(request);
+  if (!auth.ok) {
+    return new Response(JSON.stringify(auth.body), {
+      headers: { "Content-Type": "application/json" },
+      status: auth.status,
+    });
+  }
+
+  // Get current user with accounts
+  const currentUser = await getPrisma().user.findUnique({
+    where: { auth_user_id: auth.supabaseUser.id },
+    include: { internal_accounts: true },
+  });
+
+  if (!currentUser) {
+    return new Response(
+      JSON.stringify({
+        error: { message: "User not onboarded" },
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+        status: 404,
+      },
+    );
+  }
+
+  // Convert Decimal balances to numbers and format response
+  const accounts = currentUser.internal_accounts.map((account) => ({
+    id: account.id,
+    account_number: account.account_number,
+    account_type: account.account_type,
+    balance: Number(account.balance),
+    is_active: account.is_active,
+  }));
+
+  return new Response(JSON.stringify({ accounts }), {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "private, no-cache, no-store, must-revalidate",
+    },
+  });
 }
 
 export async function POST(request: Request) {

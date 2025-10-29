@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AccountManagement } from "./account-management";
 import { AtmLocator } from "./atm-locator";
 import { DashboardOverview } from "./dashboard-overview";
+import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -40,7 +42,40 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto py-8">
       <h1 className="mb-6 text-3xl font-bold">Dashboard</h1>
-      <Tabs defaultValue="overview" className="w-full">
+
+      {/* Quick Actions */}
+      <div className="mb-8 grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border p-6">
+          <h3 className="mb-2 text-lg font-semibold">Money Transfers</h3>
+          <p className="mb-4 text-sm text-gray-600">
+            Transfer money between your accounts or to external accounts
+          </p>
+          <Button
+            onClick={() => router.push("/dashboard/transfers")}
+            className="w-full"
+          >
+            Make Transfer
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+
+        <div className="rounded-lg border p-6">
+          <h3 className="mb-2 text-lg font-semibold">Transfer History</h3>
+          <p className="mb-4 text-sm text-gray-600">
+            View your recent transfer history and transaction details
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => router.push("/dashboard/transfers/history")}
+            className="w-full"
+          >
+            View History
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+      </div>
+
+      <Tabs defaultValue="account" className="w-full">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="account">Account Management</TabsTrigger>
