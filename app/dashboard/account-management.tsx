@@ -98,7 +98,7 @@ export function AccountManagement() {
     <div className="space-y-6">
       {error && (
         <div
-          className="rounded-md bg-red-50 p-4 text-sm text-red-800"
+          className="rounded-md bg-destructive/20 border border-destructive/50 p-4 text-sm text-destructive"
           role="alert"
         >
           {error}
@@ -111,20 +111,20 @@ export function AccountManagement() {
         </CardHeader>
         <CardContent>
           {accounts.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="py-8 text-center text-muted-foreground">
               <p>You don&apos;t have any accounts yet.</p>
-              <p className="text-sm mt-2">
+              <p className="mt-2 text-sm">
                 Click &quot;Create New Account&quot; to get started.
               </p>
             </div>
           ) : (
             <div className="space-y-4">
               {accounts.map((account) => (
-                <Card key={account.id} className="border-2">
+                <Card key={account.id} className="border-2 bg-card">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <CardTitle className="text-lg">
+                        <CardTitle className="text-lg text-card-foreground">
                           {account.account_type.charAt(0).toUpperCase() +
                             account.account_type.slice(1)}{" "}
                           Account
@@ -140,11 +140,11 @@ export function AccountManagement() {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-600">
+                        <label className="mb-1 text-sm font-medium text-muted-foreground">
                           Account Number
                         </label>
-                        <div className="flex items-center gap-2 mt-1">
-                          <code className="flex-1 px-3 py-2 bg-gray-100 rounded text-sm font-mono">
+                        <div className="mt-1 flex items-center gap-2">
+                          <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-sm text-card-foreground">
                             {account.account_number}
                           </code>
                           <Button
@@ -160,7 +160,7 @@ export function AccountManagement() {
                             className="shrink-0"
                           >
                             {copiedField === `account-${account.id}` ? (
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <CheckCircle2 className="h-4 w-4 text-success" />
                             ) : (
                               <Copy className="h-4 w-4" />
                             )}
@@ -169,11 +169,11 @@ export function AccountManagement() {
                       </div>
 
                       <div>
-                        <label className="text-sm font-medium text-gray-600">
+                        <label className="mb-1 text-sm font-medium text-muted-foreground">
                           Routing Number
                         </label>
-                        <div className="flex items-center gap-2 mt-1">
-                          <code className="flex-1 px-3 py-2 bg-gray-100 rounded text-sm font-mono">
+                        <div className="mt-1 flex items-center gap-2">
+                          <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-sm text-card-foreground">
                             {account.routing_number}
                           </code>
                           <Button
@@ -189,7 +189,7 @@ export function AccountManagement() {
                             className="shrink-0"
                           >
                             {copiedField === `routing-${account.id}` ? (
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <CheckCircle2 className="h-4 w-4 text-success" />
                             ) : (
                               <Copy className="h-4 w-4" />
                             )}
@@ -198,16 +198,16 @@ export function AccountManagement() {
                       </div>
                     </div>
 
-                    <div className="pt-4 border-t">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-gray-600">
+                    <div className="border-t pt-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">
                           Available Balance
                         </span>
-                        <span className="text-2xl font-bold">
+                        <span className="text-2xl font-bold text-card-foreground">
                           {formatCurrency(account.balance)}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         Account created:{" "}
                         {new Date(account.created_at).toLocaleDateString()}
                       </p>
