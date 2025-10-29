@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Profile } from "./profile";
 import { AccountManagement } from "./account-management";
 import { AtmLocator } from "./atm-locator";
 import { DashboardOverview } from "./dashboard-overview";
@@ -13,6 +14,7 @@ import { ArrowRight } from "lucide-react";
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -75,14 +77,20 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="account" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="account">Account Management</TabsTrigger>
           <TabsTrigger value="atm">ATM Near Me</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
-          <DashboardOverview />
+          <DashboardOverview
+            onNavigateToAccounts={() => setActiveTab("account")}
+          />
+        </TabsContent>
+        <TabsContent value="profile">
+          <Profile />
         </TabsContent>
         <TabsContent value="account">
           <AccountManagement />

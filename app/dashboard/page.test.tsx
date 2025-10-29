@@ -20,6 +20,11 @@ vi.mock("@/utils/supabase/client", () => ({
   }),
 }));
 
+// Mock Profile component
+vi.mock("./profile", () => ({
+  Profile: () => <div>Profile Component</div>,
+}));
+
 // Mock AccountManagement component
 vi.mock("./account-management", () => ({
   AccountManagement: () => <div>Account Management Component</div>,
@@ -62,6 +67,7 @@ describe("DashboardPage", () => {
       expect(screen.getByText("Dashboard")).toBeInTheDocument();
     });
 
+    expect(screen.getByText("Profile")).toBeInTheDocument();
     expect(screen.getByText("Account Management")).toBeInTheDocument();
   });
 

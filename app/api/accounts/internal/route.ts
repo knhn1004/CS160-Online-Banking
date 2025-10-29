@@ -182,9 +182,11 @@ export async function GET(request: Request) {
   const accounts = currentUser.internal_accounts.map((account) => ({
     id: account.id,
     account_number: account.account_number,
+    routing_number: account.routing_number,
     account_type: account.account_type,
     balance: Number(account.balance),
     is_active: account.is_active,
+    created_at: account.created_at.toISOString(),
   }));
 
   return new Response(JSON.stringify({ accounts }), {
