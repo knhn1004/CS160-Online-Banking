@@ -35,6 +35,16 @@ pnpm test
 pnpm test:watch
 ```
 
+Tests can also be run in a Docker container:
+
+```
+docker compose build
+```
+
+```bash
+pnpm run test:docker
+```
+
 6. Lint & Format
 
 ```bash
