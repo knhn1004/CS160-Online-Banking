@@ -253,7 +253,7 @@ describe("TransactionsTable", () => {
 
     await waitFor(() => {
       const inboundAmount = screen.getByText("+$100.50");
-      expect(inboundAmount).toHaveClass("text-green-600");
+      expect(inboundAmount).toHaveClass("text-success");
     });
   });
 
@@ -262,7 +262,7 @@ describe("TransactionsTable", () => {
 
     await waitFor(() => {
       const outboundAmount = screen.getByText("-$250.75");
-      expect(outboundAmount).toHaveClass("text-red-600");
+      expect(outboundAmount).toHaveClass("text-warning");
     });
   });
 

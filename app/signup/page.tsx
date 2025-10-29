@@ -197,7 +197,7 @@ export default function SignupPage() {
             <div className="space-y-1">
               <label htmlFor="username" className="text-sm font-medium">
                 Username
-                <span className="text-red-500 text-xs ml-1">*</span>
+                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="username"
@@ -208,7 +208,7 @@ export default function SignupPage() {
                 required
               />
               {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-destructive">
                   {field.state.meta.errors[0]}
                 </p>
               )}
@@ -234,7 +234,7 @@ export default function SignupPage() {
             <div className="space-y-1">
               <label htmlFor="email" className="text-sm font-medium">
                 Email
-                <span className="text-red-500 text-xs ml-1">*</span>
+                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="email"
@@ -245,7 +245,7 @@ export default function SignupPage() {
                 required
               />
               {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-destructive">
                   {field.state.meta.errors[0]}
                 </p>
               )}
@@ -280,7 +280,7 @@ export default function SignupPage() {
             <div className="space-y-1">
               <label htmlFor="password" className="text-sm font-medium">
                 Password
-                <span className="text-red-500 text-xs ml-1">*</span>
+                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="password"
@@ -291,7 +291,7 @@ export default function SignupPage() {
                 required
               />
               {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-destructive">
                   {field.state.meta.errors[0]}
                 </p>
               )}
@@ -316,7 +316,7 @@ export default function SignupPage() {
             <div className="space-y-1">
               <label htmlFor="confirmPassword" className="text-sm font-medium">
                 Confirm Password
-                <span className="text-red-500 text-xs ml-1">*</span>
+                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="confirmPassword"
@@ -327,7 +327,7 @@ export default function SignupPage() {
                 required
               />
               {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-destructive">
                   {field.state.meta.errors[0]}
                 </p>
               )}
@@ -353,7 +353,7 @@ export default function SignupPage() {
             <div className="space-y-1">
               <label htmlFor="firstName" className="text-sm font-medium">
                 First Name
-                <span className="text-red-500 text-xs ml-1">*</span>
+                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="firstName"
@@ -364,7 +364,7 @@ export default function SignupPage() {
                 required
               />
               {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-destructive">
                   {field.state.meta.errors[0]}
                 </p>
               )}
@@ -390,7 +390,7 @@ export default function SignupPage() {
             <div className="space-y-1">
               <label htmlFor="lastName" className="text-sm font-medium">
                 Last Name
-                <span className="text-red-500 text-xs ml-1">*</span>
+                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="lastName"
@@ -401,7 +401,7 @@ export default function SignupPage() {
                 required
               />
               {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-destructive">
                   {field.state.meta.errors[0]}
                 </p>
               )}
@@ -428,7 +428,7 @@ export default function SignupPage() {
             <div className="space-y-1">
               <label htmlFor="phoneNumber" className="text-sm font-medium">
                 Phone Number
-                <span className="text-red-500 text-xs ml-1">*</span>
+                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="phoneNumber"
@@ -440,7 +440,7 @@ export default function SignupPage() {
                 placeholder="(555) 123-4567 or 555-123-4567"
               />
               {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-destructive">
                   {field.state.meta.errors[0]}
                 </p>
               )}
@@ -466,7 +466,7 @@ export default function SignupPage() {
             <div className="space-y-1">
               <label htmlFor="streetAddress" className="text-sm font-medium">
                 Street Address
-                <span className="text-red-500 text-xs ml-1">*</span>
+                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="streetAddress"
@@ -477,7 +477,7 @@ export default function SignupPage() {
                 required
               />
               {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-destructive">
                   {field.state.meta.errors[0]}
                 </p>
               )}
@@ -521,7 +521,7 @@ export default function SignupPage() {
             <div className="space-y-1">
               <label htmlFor="city" className="text-sm font-medium">
                 City
-                <span className="text-red-500 text-xs ml-1">*</span>
+                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="city"
@@ -532,7 +532,7 @@ export default function SignupPage() {
                 required
               />
               {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-destructive">
                   {field.state.meta.errors[0]}
                 </p>
               )}
@@ -555,7 +555,7 @@ export default function SignupPage() {
             <div className="space-y-1">
               <label htmlFor="stateOrTerritory" className="text-sm font-medium">
                 State/Territory
-                <span className="text-red-500 text-xs ml-1">*</span>
+                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <select
                 id="stateOrTerritory"
@@ -575,7 +575,7 @@ export default function SignupPage() {
                 ))}
               </select>
               {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-destructive">
                   {field.state.meta.errors[0]}
                 </p>
               )}
@@ -604,7 +604,7 @@ export default function SignupPage() {
             <div className="space-y-1">
               <label htmlFor="postalCode" className="text-sm font-medium">
                 Postal Code
-                <span className="text-red-500 text-xs ml-1">*</span>
+                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="postalCode"
@@ -617,7 +617,7 @@ export default function SignupPage() {
                 maxLength={10}
               />
               {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-destructive">
                   {field.state.meta.errors[0]}
                 </p>
               )}
@@ -625,7 +625,7 @@ export default function SignupPage() {
           )}
         </form.Field>
 
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button type="submit" disabled={loading} className="w-full">
           {loading ? "Signing up..." : "Sign up"}
         </Button>

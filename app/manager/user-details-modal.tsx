@@ -140,7 +140,7 @@ export function UserDetailsModal({
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-500">
+                    <label className="text-sm font-medium text-muted-foreground">
                       Name
                     </label>
                     <p className="text-lg">
@@ -148,25 +148,25 @@ export function UserDetailsModal({
                     </p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">
+                    <label className="text-sm font-medium text-muted-foreground">
                       Username
                     </label>
                     <p className="text-lg">{user.username}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">
+                    <label className="text-sm font-medium text-muted-foreground">
                       Email
                     </label>
                     <p className="text-lg">{user.email}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">
+                    <label className="text-sm font-medium text-muted-foreground">
                       Phone
                     </label>
                     <p className="text-lg">{user.phone_number}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">
+                    <label className="text-sm font-medium text-muted-foreground">
                       Address
                     </label>
                     <p className="text-lg">
@@ -184,7 +184,7 @@ export function UserDetailsModal({
                     </p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">
+                    <label className="text-sm font-medium text-muted-foreground">
                       Member Since
                     </label>
                     <p className="text-lg">{formatDate(user.created_at)}</p>
@@ -201,22 +201,28 @@ export function UserDetailsModal({
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">
+                    <p className="text-2xl font-bold text-success">
                       {formatCurrency(totalBalance)}
                     </p>
-                    <p className="text-sm text-gray-500">Total Balance</p>
+                    <p className="text-sm text-muted-foreground">
+                      Total Balance
+                    </p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold">
                       {user.internal_accounts.length}
                     </p>
-                    <p className="text-sm text-gray-500">Active Accounts</p>
+                    <p className="text-sm text-muted-foreground">
+                      Active Accounts
+                    </p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold">
                       {user._count.internal_accounts}
                     </p>
-                    <p className="text-sm text-gray-500">Total Transactions</p>
+                    <p className="text-sm text-muted-foreground">
+                      Total Transactions
+                    </p>
                   </div>
                 </div>
 
@@ -225,13 +231,13 @@ export function UserDetailsModal({
                   {user.internal_accounts.map((account) => (
                     <div
                       key={account.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
                     >
                       <div>
                         <p className="font-medium">
                           ****{account.account_number.slice(-4)}
                         </p>
-                        <p className="text-sm text-gray-500 capitalize">
+                        <p className="text-sm text-muted-foreground capitalize">
                           {account.account_type.replace("_", " ")}
                         </p>
                       </div>
@@ -262,13 +268,13 @@ export function UserDetailsModal({
                     {recentTransactions.map((transaction) => (
                       <div
                         key={transaction.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
                       >
                         <div>
                           <p className="font-medium">
                             {formatCurrency(Number(transaction.amount))}
                           </p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-muted-foreground">
                             {transaction.transaction_type
                               .replace("_", " ")
                               .toUpperCase()}
@@ -291,7 +297,7 @@ export function UserDetailsModal({
                               {transaction.direction.toUpperCase()}
                             </Badge>
                           </div>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-muted-foreground">
                             {formatDate(transaction.created_at)}
                           </p>
                         </div>
@@ -299,7 +305,7 @@ export function UserDetailsModal({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-center py-4">
+                  <p className="text-muted-foreground text-center py-4">
                     No recent transactions
                   </p>
                 )}
@@ -308,7 +314,7 @@ export function UserDetailsModal({
           </div>
         ) : (
           <div className="text-center py-8">
-            <p className="text-gray-500">User not found</p>
+            <p className="text-muted-foreground">User not found</p>
           </div>
         )}
       </SheetContent>

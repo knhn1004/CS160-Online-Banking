@@ -34,7 +34,6 @@ interface DashboardData {
  * Internal function to fetch dashboard data without caching
  */
 async function fetchDashboardDataInternal(
-  userId: string,
   accessToken: string,
   baseUrl: string,
 ): Promise<DashboardData | null> {
@@ -108,7 +107,6 @@ export async function getDashboardData(): Promise<DashboardData | null> {
 
   if (!supabaseUser) {
     redirect("/login");
-    return null;
   }
 
   // Get session with access token
@@ -118,7 +116,6 @@ export async function getDashboardData(): Promise<DashboardData | null> {
 
   if (!session) {
     redirect("/login");
-    return null;
   }
 
   // Get the base URL for API calls
@@ -131,7 +128,44 @@ export async function getDashboardData(): Promise<DashboardData | null> {
     try {
       const headersList = await headers();
       const host = headersList.get("host") || "localhost:3000";
-      const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
+
+      // Detect protocol from request headers (for reverse proxies)
+      // Check x-forwarded-proto first (most common)
+      const forwardedProto = headersList.get("x-forwarded-proto");
+      // Check forwarded header (RFC 7239)
+      const forwarded = headersList.get("forwarded");
+
+      // For localhost in development, always use http
+      const isLocalhost =
+        host.includes("localhost") || host.includes("127.0.0.1");
+
+      let protocol = "http"; // Default to http
+
+      if (forwardedProto) {
+        protocol = forwardedProto.split(",")[0].trim();
+      } else if (forwarded) {
+        // Parse forwarded header: proto=https;host=example.com
+        const protoMatch = forwarded.match(/proto=([^;,\s]+)/i);
+        if (protoMatch) {
+          protocol = protoMatch[1].trim();
+        }
+      } else if (!isLocalhost && process.env.NODE_ENV === "production") {
+        // Only assume https in production for non-localhost hosts if no proxy headers are set
+        protocol = "https";
+      } else {
+        // Default to http for localhost and development
+        protocol = "http";
+      }
+
+      // Ensure protocol is http or https
+      if (protocol !== "http" && protocol !== "https") {
+        protocol = isLocalhost
+          ? "http"
+          : process.env.NODE_ENV === "production"
+            ? "https"
+            : "http";
+      }
+
       baseUrl = `${protocol}://${host}`;
     } catch {
       // Fallback for test environments where headers() isn't available
@@ -142,11 +176,7 @@ export async function getDashboardData(): Promise<DashboardData | null> {
   // Create cached version with tags for granular invalidation
   const getCachedDashboardData = unstable_cache(
     async () => {
-      return fetchDashboardDataInternal(
-        supabaseUser.id,
-        session.access_token,
-        baseUrl,
-      );
+      return fetchDashboardDataInternal(session.access_token, baseUrl);
     },
     [`dashboard-${supabaseUser.id}`], // Cache key
     {
