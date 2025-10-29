@@ -317,7 +317,7 @@ export function ExternalTransfer() {
         </CardHeader>
         <CardContent>
           <div
-            className="rounded-md bg-red-50 p-4 text-sm text-red-800"
+            className="rounded-md bg-destructive/20 border border-destructive/50 p-4 text-sm text-destructive"
             role="alert"
           >
             {error}
@@ -338,14 +338,14 @@ export function ExternalTransfer() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-center py-4">
-            <CheckCircle className="h-16 w-16 text-green-500" />
+            <CheckCircle className="h-16 w-16 text-success" />
           </div>
           <div className="space-y-2 text-center">
             <p className="text-lg font-semibold">
               {formatCurrency(successData.amount / 100)} sent to{" "}
               {successData.recipient_name}
             </p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Transaction ID: {successData.transaction_id}
             </p>
           </div>
@@ -419,7 +419,7 @@ export function ExternalTransfer() {
               </span>
             </div>
             {sourceAccount && (
-              <div className="flex justify-between text-sm text-gray-600">
+              <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Available Balance:</span>
                 <span>{formatCurrency(sourceAccount.balance)}</span>
               </div>
@@ -428,7 +428,7 @@ export function ExternalTransfer() {
 
           {error && (
             <div
-              className="rounded-md bg-red-50 p-4 text-sm text-red-800"
+              className="rounded-md bg-destructive/20 border border-destructive/50 p-4 text-sm text-destructive"
               role="alert"
             >
               {error}
@@ -507,7 +507,7 @@ export function ExternalTransfer() {
                             <Badge variant="secondary" className="text-xs">
                               {account.account_type}
                             </Badge>
-                            <span className="text-sm text-gray-600">
+                            <span className="text-sm text-muted-foreground">
                               {formatCurrency(account.balance)}
                             </span>
                           </div>
@@ -517,7 +517,7 @@ export function ExternalTransfer() {
                   </SelectContent>
                 </Select>
                 {field.state.meta.errors.length > 0 && (
-                  <p className="text-sm text-red-600">
+                  <p className="text-sm text-warning">
                     {field.state.meta.errors[0]}
                   </p>
                 )}
@@ -527,7 +527,7 @@ export function ExternalTransfer() {
 
           <div className="space-y-4">
             <div className="text-sm font-medium">Recipient</div>
-            <div className="space-y-3 rounded-lg border p-4 bg-gray-50">
+            <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
               <form.Field name="recipient_email">
                 {(field) => (
                   <div className="space-y-2">
@@ -550,7 +550,9 @@ export function ExternalTransfer() {
                 )}
               </form.Field>
 
-              <div className="text-center text-sm text-gray-500">or</div>
+              <div className="text-center text-sm text-muted-foreground">
+                or
+              </div>
 
               <form.Field name="recipient_phone">
                 {(field) => (
@@ -611,11 +613,11 @@ export function ExternalTransfer() {
                         {lookupResult.user.first_name}{" "}
                         {lookupResult.user.last_name}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         {lookupResult.user.email}
                       </p>
                     </div>
-                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <CheckCircle className="h-5 w-5 text-success" />
                   </div>
 
                   {lookupResult.user.accounts.length > 0 && (
@@ -666,7 +668,7 @@ export function ExternalTransfer() {
                             </SelectContent>
                           </Select>
                           {field.state.meta.errors.length > 0 && (
-                            <p className="text-sm text-red-600">
+                            <p className="text-sm text-warning">
                               {field.state.meta.errors[0]}
                             </p>
                           )}
@@ -715,7 +717,7 @@ export function ExternalTransfer() {
                   placeholder="0.00"
                 />
                 {field.state.meta.errors.length > 0 && (
-                  <p className="text-sm text-red-600">
+                  <p className="text-sm text-warning">
                     {field.state.meta.errors[0]}
                   </p>
                 )}
@@ -725,7 +727,7 @@ export function ExternalTransfer() {
 
           {error && (
             <div
-              className="rounded-md bg-red-50 p-4 text-sm text-red-800"
+              className="rounded-md bg-destructive/20 border border-destructive/50 p-4 text-sm text-destructive"
               role="alert"
             >
               {error}

@@ -217,7 +217,7 @@ export function Profile() {
 
       {error && (
         <div
-          className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-800"
+          className="mb-4 rounded-md bg-destructive/20 border border-destructive/50 p-4 text-sm text-destructive"
           role="alert"
         >
           {error}
@@ -226,7 +226,7 @@ export function Profile() {
 
       {success && (
         <div
-          className="mb-4 rounded-md bg-green-50 p-4 text-sm text-green-800"
+          className="mb-4 rounded-md bg-success/20 border border-success/50 p-4 text-sm text-success"
           role="alert"
         >
           Profile updated successfully!
@@ -277,9 +277,9 @@ export function Profile() {
               type="email"
               value={profile.email}
               disabled
-              className="bg-gray-50"
+              className="bg-muted"
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               Email is managed by your account authentication
             </p>
           </div>

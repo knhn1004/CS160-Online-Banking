@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "@tanstack/react-form";
 import { createClient } from "@/utils/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -8,8 +9,23 @@ import { Button } from "@/components/ui/button";
 import { z } from "zod";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        router.push("/dashboard");
+      }
+    };
+    checkAuth();
+  }, [router]);
 
   const form = useForm({
     defaultValues: {
@@ -32,7 +48,7 @@ export default function LoginPage() {
           return;
         }
 
-        window.location.assign("/");
+        window.location.assign("/dashboard");
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {

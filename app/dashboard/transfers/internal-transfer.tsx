@@ -217,7 +217,7 @@ export function InternalTransfer() {
         </CardHeader>
         <CardContent>
           <div
-            className="rounded-md bg-red-50 p-4 text-sm text-red-800"
+            className="rounded-md bg-destructive/20 border border-destructive/50 p-4 text-sm text-destructive"
             role="alert"
           >
             {error}
@@ -238,7 +238,7 @@ export function InternalTransfer() {
         </CardHeader>
         <CardContent>
           <div
-            className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800"
+            className="rounded-md bg-warning/20 border border-warning/50 p-4 text-sm text-warning"
             role="alert"
           >
             You need at least 2 active accounts to make internal transfers.
@@ -254,23 +254,23 @@ export function InternalTransfer() {
         <Breadcrumbs currentPage="Internal Transfer" />
         <Card>
           <CardHeader>
-            <CardTitle className="text-center text-green-600">
+            <CardTitle className="text-center text-success">
               Transfer Successful!
             </CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
-            <CheckCircle className="h-16 w-16 text-green-600 mx-auto" />
+            <CheckCircle className="mx-auto h-16 w-16 text-success" />
             <div className="space-y-2">
               <p className="text-lg font-semibold">
                 {formatCurrency(successData.amount / 100)}
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 From: ****{successData.source_account.slice(-4)}
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 To: ****{successData.destination_account.slice(-4)}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Transaction ID: {successData.transaction_id}
               </p>
             </div>
@@ -335,7 +335,7 @@ export function InternalTransfer() {
               </span>
             </div>
             {sourceAccount && (
-              <div className="flex justify-between text-sm text-gray-600">
+              <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Available Balance:</span>
                 <span>{formatCurrency(sourceAccount.balance)}</span>
               </div>
@@ -344,7 +344,7 @@ export function InternalTransfer() {
 
           {error && (
             <div
-              className="rounded-md bg-red-50 p-4 text-sm text-red-800"
+              className="rounded-md bg-destructive/20 border border-destructive/50 p-4 text-sm text-destructive"
               role="alert"
             >
               {error}
@@ -427,7 +427,7 @@ export function InternalTransfer() {
                     </SelectContent>
                   </Select>
                   {field.state.meta.errors.length > 0 && (
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-warning">
                       {field.state.meta.errors[0]}
                     </p>
                   )}
@@ -486,7 +486,7 @@ export function InternalTransfer() {
                     </SelectContent>
                   </Select>
                   {field.state.meta.errors.length > 0 && (
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-warning">
                       {field.state.meta.errors[0]}
                     </p>
                   )}
@@ -530,11 +530,11 @@ export function InternalTransfer() {
                     onChange={(value) => field.handleChange(value)}
                   />
                   {field.state.meta.errors.length > 0 && (
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-warning">
                       {field.state.meta.errors[0]}
                     </p>
                   )}
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     Enter amount in dollars (e.g., 100.50 for $100.50)
                   </p>
                 </div>
@@ -543,7 +543,7 @@ export function InternalTransfer() {
 
             {error && (
               <div
-                className="rounded-md bg-red-50 p-4 text-sm text-red-800"
+                className="rounded-md bg-destructive/20 border border-destructive/50 p-4 text-sm text-destructive"
                 role="alert"
               >
                 {error}
