@@ -44,6 +44,7 @@
     "next": "15.4.6",
     "next-swagger-doc": "^0.4.1",
     "react": "19.1.0",
+    "react-currency-input-field": "^4.0.3",
     "react-dom": "19.1.0",
     "swagger-ui-react": "^5.29.4",
     "tailwind-merge": "^3.3.1",

@@ -19,7 +19,7 @@ export const Amount = z
   .transform((v) => (typeof v === "number" ? String(v) : v.trim()))
   .refine((v) => /^-?\d+(\.\d{1,2})?$/.test(v), "Invalid amount (max 2 dp)")
   .transform((v) => new Decimal(v))
-  .refine((d) => d.gt(0), "Amount must be > 0");
+  .refine((d) => Number(d) > 0, "Amount must be > 0");
 
 // Helper to create a denied transaction record
 export async function createDeniedTransaction(

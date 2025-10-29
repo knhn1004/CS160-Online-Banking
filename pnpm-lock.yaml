@@ -76,6 +76,9 @@ importers:
       react:
         specifier: 19.1.0
         version: 19.1.0
+      react-currency-input-field:
+        specifier: ^4.0.3
+        version: 4.0.3(react@19.1.0)
       react-dom:
         specifier: 19.1.0
         version: 19.1.0(react@19.1.0)
@@ -8185,6 +8188,14 @@ packages:
     peerDependencies:
       react: ^15.3.0 || 16 || 17 || 18
 
+  react-currency-input-field@4.0.3:
+    resolution:
+      {
+        integrity: sha512-alimHDX5tplPsNB3jEAW7qjlJ76RfBAc/p8yru3cTiAYslj3oJ+KNnk788IZYe6ja3cAuH26v047lMzadh47ow==,
+      }
+    peerDependencies:
+      react: ^16.9.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   react-debounce-input@3.3.0:
     resolution:
       {
@@ -15871,6 +15882,10 @@ snapshots:
     dependencies:
       copy-to-clipboard: 3.3.3
       prop-types: 15.8.1
+      react: 19.1.0
+
+  react-currency-input-field@4.0.3(react@19.1.0):
+    dependencies:
       react: 19.1.0
 
   react-debounce-input@3.3.0(react@19.1.0):

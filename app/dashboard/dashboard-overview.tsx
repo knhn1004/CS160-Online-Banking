@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowRight } from "lucide-react";
 
 interface Account {
   id: number;
@@ -32,7 +33,13 @@ interface DashboardData {
   totalBalance: number;
 }
 
-export function DashboardOverview() {
+interface DashboardOverviewProps {
+  onNavigateToAccounts?: () => void;
+}
+
+export function DashboardOverview({
+  onNavigateToAccounts,
+}: DashboardOverviewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
@@ -223,7 +230,15 @@ export function DashboardOverview() {
 
       {/* Accounts Overview */}
       <div className="rounded-lg border p-6">
-        <h2 className="text-xl font-semibold mb-4">Your Accounts</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Your Accounts</h2>
+          {onNavigateToAccounts && (
+            <Button variant="outline" size="sm" onClick={onNavigateToAccounts}>
+              Manage Accounts
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          )}
+        </div>
         {data.accounts.length === 0 ? (
           <p className="text-gray-500">No accounts found</p>
         ) : (
@@ -233,13 +248,13 @@ export function DashboardOverview() {
                 key={account.id}
                 className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium capitalize">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-medium capitalize whitespace-nowrap">
                       {account.account_type} Account
                     </h3>
                     <span
-                      className={`px-2 py-1 text-xs rounded-full ${
+                      className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
                         account.is_active
                           ? "bg-green-100 text-green-800"
                           : "bg-red-100 text-red-800"
@@ -252,8 +267,8 @@ export function DashboardOverview() {
                     ****{account.account_number.slice(-4)}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-semibold">
+                <div className="text-right ml-4 flex-shrink-0">
+                  <p className="text-lg font-semibold whitespace-nowrap">
                     {formatCurrency(account.balance)}
                   </p>
                 </div>
@@ -284,26 +299,28 @@ export function DashboardOverview() {
                   key={transaction.id}
                   className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
                 >
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs text-gray-500">
                         Account: {censoredAccountId}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span>
+                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-1">
+                      <span className="whitespace-nowrap">
                         Transaction Type:{" "}
                         {transaction.transaction_type.replace("_", " ")}
                       </span>
-                      <span>Status: {transaction.status}</span>
+                      <span className="whitespace-nowrap">
+                        Status: {transaction.status}
+                      </span>
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-gray-500">
                       {formatDate(transaction.created_at)}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right ml-4 flex-shrink-0">
                     <p
-                      className={`font-semibold ${
+                      className={`text-lg font-semibold whitespace-nowrap ${
                         transaction.direction === "inbound"
                           ? "text-green-600"
                           : "text-red-600"

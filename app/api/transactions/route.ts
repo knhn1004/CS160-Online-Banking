@@ -385,7 +385,7 @@ export async function POST(request: Request) {
     if (!parseResult.success) {
       return json(422, {
         error: "Invalid request body.",
-        details: z.treeifyError(parseResult.error),
+        details: parseResult.error.issues,
       });
     }
     const request_body = parseResult.data;
