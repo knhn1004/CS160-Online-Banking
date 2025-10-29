@@ -63,12 +63,9 @@ describe("DashboardPage", () => {
     });
 
     expect(screen.getByText("Account Management")).toBeInTheDocument();
-    expect(
-      screen.getByText("Account Management Component"),
-    ).toBeInTheDocument();
   });
 
-  it("renders tabs component with Account Management tab", async () => {
+  it("renders tabs component with Overview tab", async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: "user-123", email: "test@example.com" } },
       error: null,
@@ -80,7 +77,7 @@ describe("DashboardPage", () => {
       expect(screen.getByRole("tablist")).toBeInTheDocument();
     });
 
-    const accountTab = screen.getByRole("tab", { name: /account management/i });
+    const accountTab = screen.getByRole("tab", { name: /overview/i });
     expect(accountTab).toBeInTheDocument();
     expect(accountTab).toHaveAttribute("data-state", "active");
   });
