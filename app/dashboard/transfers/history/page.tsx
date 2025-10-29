@@ -175,7 +175,10 @@ export default function TransferHistoryPage() {
     switch (status) {
       case "approved":
         return (
-          <Badge variant="default" className="bg-green-100 text-green-800">
+          <Badge
+            variant="default"
+            className="bg-success/20 text-success border-success/50"
+          >
             Approved
           </Badge>
         );
@@ -298,7 +301,7 @@ export default function TransferHistoryPage() {
 
       {error && (
         <div
-          className="mb-6 rounded-md bg-red-50 p-4 text-sm text-red-800"
+          className="mb-6 rounded-md bg-destructive/20 border border-destructive/50 p-4 text-sm text-destructive"
           role="alert"
         >
           {error}
@@ -312,7 +315,7 @@ export default function TransferHistoryPage() {
         <CardContent>
           {transfers.length === 0 ? (
             <div className="flex items-center justify-center py-8">
-              <p className="text-gray-500">No transfers found</p>
+              <p className="text-muted-foreground">No transfers found</p>
             </div>
           ) : (
             <>
@@ -340,8 +343,8 @@ export default function TransferHistoryPage() {
                         <TableCell
                           className={
                             transfer.direction === "outbound"
-                              ? "text-red-600"
-                              : "text-green-600"
+                              ? "text-warning"
+                              : "text-success"
                           }
                         >
                           {transfer.direction === "outbound" ? "-" : "+"}
@@ -356,7 +359,7 @@ export default function TransferHistoryPage() {
 
               {pagination.total_pages > 1 && (
                 <div className="mt-6 flex items-center justify-between">
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-muted-foreground">
                     Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
                     {Math.min(
                       pagination.page * pagination.limit,

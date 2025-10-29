@@ -90,65 +90,67 @@ export function DashboardOverview({
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-lg border p-6">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">
+        <div className="rounded-lg border bg-card p-6">
+          <h3 className="mb-2 text-sm font-medium text-muted-foreground">
             Total Balance
           </h3>
-          <p className="text-3xl font-bold text-green-600">
+          <p className="text-3xl font-bold text-success">
             {formatCurrency(data.totalBalance)}
           </p>
         </div>
-        <div className="rounded-lg border p-6">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">
+        <div className="rounded-lg border bg-card p-6">
+          <h3 className="mb-2 text-sm font-medium text-muted-foreground">
             Active Accounts
           </h3>
-          <p className="text-3xl font-bold text-blue-600">
+          <p className="text-3xl font-bold text-accent">
             {data.accounts.filter((account) => account.is_active).length}
           </p>
         </div>
       </div>
 
       {/* Accounts Overview */}
-      <div className="rounded-lg border p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Your Accounts</h2>
+      <div className="rounded-lg border bg-card p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-card-foreground">
+            Your Accounts
+          </h2>
           {onNavigateToAccounts && (
             <Button variant="outline" size="sm" onClick={onNavigateToAccounts}>
               Manage Accounts
-              <ArrowRight className="h-4 w-4 ml-2" />
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           )}
         </div>
         {data.accounts.length === 0 ? (
-          <p className="text-gray-500">No accounts found</p>
+          <p className="text-muted-foreground">No accounts found</p>
         ) : (
           <div className="space-y-4">
             {data.accounts.map((account) => (
               <div
                 key={account.id}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                className="flex items-center justify-between rounded-lg border bg-muted/30 p-4"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-medium capitalize whitespace-nowrap">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center gap-2">
+                    <h3 className="whitespace-nowrap font-medium capitalize text-card-foreground">
                       {account.account_type} Account
                     </h3>
                     <span
-                      className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
+                      className={`whitespace-nowrap rounded-full px-2 py-1 text-xs ${
                         account.is_active
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
+                          ? "bg-success/20 text-success"
+                          : "bg-warning/20 text-warning"
                       }`}
                     >
                       {account.is_active ? "Active" : "Inactive"}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     ****{account.account_number.slice(-4)}
                   </p>
                 </div>
-                <div className="text-right ml-4 flex-shrink-0">
-                  <p className="text-lg font-semibold whitespace-nowrap">
+                <div className="ml-4 flex-shrink-0 text-right">
+                  <p className="whitespace-nowrap text-lg font-semibold text-card-foreground">
                     {formatCurrency(account.balance)}
                   </p>
                 </div>
@@ -159,10 +161,12 @@ export function DashboardOverview({
       </div>
 
       {/* Recent Activity */}
-      <div className="rounded-lg border p-6">
-        <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
+      <div className="rounded-lg border bg-card p-6">
+        <h2 className="mb-4 text-xl font-semibold text-card-foreground">
+          Recent Activity
+        </h2>
         {data.transactions.length === 0 ? (
-          <p className="text-gray-500">No recent transactions</p>
+          <p className="text-muted-foreground">No recent transactions</p>
         ) : (
           <div className="space-y-3">
             {data.transactions.slice(0, 5).map((transaction) => {
@@ -177,15 +181,15 @@ export function DashboardOverview({
               return (
                 <div
                   key={transaction.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                  className="flex items-center justify-between rounded-lg border bg-muted/30 p-4"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs text-gray-500">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
                         Account: {censoredAccountId}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-1">
+                    <div className="mb-1 flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="whitespace-nowrap">
                         Transaction Type:{" "}
                         {transaction.transaction_type.replace("_", " ")}
@@ -194,16 +198,16 @@ export function DashboardOverview({
                         Status: {transaction.status}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       {formatDate(transaction.created_at)}
                     </p>
                   </div>
-                  <div className="text-right ml-4 flex-shrink-0">
+                  <div className="ml-4 flex-shrink-0 text-right">
                     <p
-                      className={`text-lg font-semibold whitespace-nowrap ${
+                      className={`whitespace-nowrap text-lg font-semibold ${
                         transaction.direction === "inbound"
-                          ? "text-green-600"
-                          : "text-red-600"
+                          ? "text-success"
+                          : "text-warning"
                       }`}
                     >
                       {transaction.direction === "inbound" ? "+" : "-"}

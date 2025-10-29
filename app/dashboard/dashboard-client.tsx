@@ -45,9 +45,11 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
 
       {/* Quick Actions */}
       <div className="mb-8 grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border p-6">
-          <h3 className="mb-2 text-lg font-semibold">Money Transfers</h3>
-          <p className="mb-4 text-sm text-gray-600">
+        <div className="rounded-lg border bg-card p-6">
+          <h3 className="mb-2 text-lg font-semibold text-card-foreground">
+            Money Transfers
+          </h3>
+          <p className="mb-4 text-sm text-muted-foreground">
             Transfer money between your accounts or to external accounts
           </p>
           <Button
@@ -55,13 +57,15 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
             className="w-full"
           >
             Make Transfer
-            <ArrowRight className="h-4 w-4 ml-2" />
+            <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
 
-        <div className="rounded-lg border p-6">
-          <h3 className="mb-2 text-lg font-semibold">Transfer History</h3>
-          <p className="mb-4 text-sm text-gray-600">
+        <div className="rounded-lg border bg-card p-6">
+          <h3 className="mb-2 text-lg font-semibold text-card-foreground">
+            Transfer History
+          </h3>
+          <p className="mb-4 text-sm text-muted-foreground">
             View your recent transfer history and transaction details
           </p>
           <Button
@@ -70,7 +74,7 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
             className="w-full"
           >
             View History
-            <ArrowRight className="h-4 w-4 ml-2" />
+            <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
       </div>
