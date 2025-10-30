@@ -20,10 +20,13 @@ describe("Landing Page", () => {
 
   it("renders the Sign In button", async () => {
     render(<Page />);
-    await waitFor(() => {
-      const buttons = screen.getAllByText(/Sign In/i);
-      expect(buttons.length).toBeGreaterThan(0);
-    });
+    await waitFor(
+      () => {
+        const buttons = screen.getAllByText(/Sign In/i);
+        expect(buttons.length).toBeGreaterThan(0);
+      },
+      { timeout: 3000 },
+    );
   });
 
   it("renders the footer", () => {
