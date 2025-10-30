@@ -51,8 +51,11 @@ async function unscheduleCronJob(ruleId: number): Promise<void> {
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  // Await params in Next.js 15
+  const { id } = await params;
+
   // Auth check
   const auth = await getAuthUserFromRequest(request);
   if (!auth.ok) {
@@ -80,7 +83,7 @@ export async function DELETE(
   }
 
   try {
-    const ruleId = parseInt(params.id, 10);
+    const ruleId = parseInt(id, 10);
     if (isNaN(ruleId)) {
       return new Response(
         JSON.stringify({
