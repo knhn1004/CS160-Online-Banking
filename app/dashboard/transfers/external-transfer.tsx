@@ -596,17 +596,8 @@ export function ExternalTransfer() {
                 </div>
               )}
 
-              {lookupResult?.found === false && !lookupLoading && (
-                <div
-                  className="rounded-md bg-warning/20 border border-warning/50 p-3 text-sm text-warning"
-                  role="alert"
-                >
-                  Recipient not found. Please verify the email or phone number.
-                </div>
-              )}
-
               {lookupResult?.found && lookupResult.user && (
-                <div className="space-y-3 rounded-lg border bg-white p-4">
+                <div className="space-y-3 rounded-lg border bg-card p-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold">
@@ -740,15 +731,28 @@ export function ExternalTransfer() {
                 {({ state: destState }) => (
                   <form.Field name="amount">
                     {({ state: amountState }) => {
+                      // For mock users (black hole) or users without accounts, destState.value may be undefined
+                      // Allow continue if we have a lookup result (found === true) or recipient info is filled
+                      const hasRecipient =
+                        lookupResult?.found ||
+                        form.getFieldValue("recipient_email") ||
+                        form.getFieldValue("recipient_phone");
+
+                      // Only require destination_account_id if recipient has accounts
+                      const requiresDestinationAccount =
+                        lookupResult?.user &&
+                        lookupResult.user.accounts.length > 0 &&
+                        lookupResult.user.id !== -1; // Mock users don't need destination account
+
                       const isDisabled =
                         !sourceState.value ||
                         sourceState.value === 0 ||
-                        !destState.value ||
+                        (requiresDestinationAccount && !destState.value) ||
                         !amountState.value ||
                         amountState.value.trim() === "" ||
                         parseFloat(amountState.value) <= 0 ||
                         amountState.meta.errors.length > 0 ||
-                        !lookupResult?.found;
+                        !hasRecipient;
                       return (
                         <Button
                           type="button"

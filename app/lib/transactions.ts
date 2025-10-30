@@ -87,6 +87,9 @@ export async function createApprovedTransaction(
     idempotency_key?: string | null;
     bill_pay_rule_id?: number;
     transfer_rule_id?: number;
+    external_routing_number?: string;
+    external_account_number?: string;
+    external_nickname?: string;
   },
   successMessage: string,
 ) {

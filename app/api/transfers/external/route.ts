@@ -188,16 +188,46 @@ export async function POST(request: Request) {
       });
 
       if (!recipientUser) {
-        return new Response(
-          JSON.stringify({
-            error:
-              "Recipient not found. Please verify the email or phone number.",
-          }),
-          {
-            headers: { "Content-Type": "application/json" },
-            status: 404,
-          },
-        );
+        // Black hole: recipient not found, but proceed with fake user info
+        // This simulates a transfer to an external account that doesn't exist in our system
+        const fakeRecipientName = "External Recipient";
+
+        // Execute transfer with only outbound transaction (black hole)
+        const result = await getPrisma().$transaction(async (tx) => {
+          const idempotency_key = `external-transfer-blackhole-${source_account_id}-${Date.now()}`;
+          const amountInDollars = amount / 100;
+
+          // Create only outbound transaction (no inbound - black hole)
+          const outboundTransaction = await tx.transaction.create({
+            data: {
+              internal_account_id: source_account_id,
+              amount: -amountInDollars, // Negative for outbound
+              transaction_type: "external_transfer",
+              direction: "outbound",
+              status: "approved",
+              idempotency_key: `${idempotency_key}-outbound`,
+              external_nickname: fakeRecipientName,
+            },
+          });
+
+          // Deduct from source account
+          await tx.internalAccount.update({
+            where: { id: source_account_id },
+            data: { balance: { decrement: amountInDollars } },
+          });
+
+          return {
+            success: true,
+            message: "Transfer completed successfully",
+            transaction_id: outboundTransaction.id,
+            recipient_name: fakeRecipientName,
+            amount,
+          };
+        });
+
+        return new Response(JSON.stringify(result), {
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
       // Don't allow transferring to yourself
@@ -219,16 +249,47 @@ export async function POST(request: Request) {
         destinationAccountId = recipientUser.internal_accounts[0].id;
       }
 
-      if (!destinationAccountId) {
-        return new Response(
-          JSON.stringify({
-            error: "Recipient has no active accounts",
-          }),
-          {
-            headers: { "Content-Type": "application/json" },
-            status: 400,
-          },
-        );
+      // If mock user (id: -1) or no accounts, treat as black hole
+      if (recipientUser.id === -1 || !destinationAccountId) {
+        // Black hole: mock user or no accounts, proceed with fake user info
+        const fakeRecipientName = "External Recipient";
+
+        // Execute transfer with only outbound transaction (black hole)
+        const result = await getPrisma().$transaction(async (tx) => {
+          const idempotency_key = `external-transfer-blackhole-${source_account_id}-${Date.now()}`;
+          const amountInDollars = amount / 100;
+
+          // Create only outbound transaction (no inbound - black hole)
+          const outboundTransaction = await tx.transaction.create({
+            data: {
+              internal_account_id: source_account_id,
+              amount: -amountInDollars, // Negative for outbound
+              transaction_type: "external_transfer",
+              direction: "outbound",
+              status: "approved",
+              idempotency_key: `${idempotency_key}-outbound`,
+              external_nickname: fakeRecipientName,
+            },
+          });
+
+          // Deduct from source account
+          await tx.internalAccount.update({
+            where: { id: source_account_id },
+            data: { balance: { decrement: amountInDollars } },
+          });
+
+          return {
+            success: true,
+            message: "Transfer completed successfully",
+            transaction_id: outboundTransaction.id,
+            recipient_name: fakeRecipientName,
+            amount,
+          };
+        });
+
+        return new Response(JSON.stringify(result), {
+          headers: { "Content-Type": "application/json" },
+        });
       }
     }
 
@@ -251,15 +312,45 @@ export async function POST(request: Request) {
     });
 
     if (!destinationAccount) {
-      return new Response(
-        JSON.stringify({
-          error: "Destination account not found",
-        }),
-        {
-          headers: { "Content-Type": "application/json" },
-          status: 404,
-        },
-      );
+      // Black hole: destination account not found, but proceed with fake user info
+      const fakeRecipientName = "External Recipient";
+
+      // Execute transfer with only outbound transaction (black hole)
+      const result = await getPrisma().$transaction(async (tx) => {
+        const idempotency_key = `external-transfer-blackhole-${source_account_id}-${Date.now()}`;
+        const amountInDollars = amount / 100;
+
+        // Create only outbound transaction (no inbound - black hole)
+        const outboundTransaction = await tx.transaction.create({
+          data: {
+            internal_account_id: source_account_id,
+            amount: -amountInDollars, // Negative for outbound
+            transaction_type: "external_transfer",
+            direction: "outbound",
+            status: "approved",
+            idempotency_key: `${idempotency_key}-outbound`,
+            external_nickname: fakeRecipientName,
+          },
+        });
+
+        // Deduct from source account
+        await tx.internalAccount.update({
+          where: { id: source_account_id },
+          data: { balance: { decrement: amountInDollars } },
+        });
+
+        return {
+          success: true,
+          message: "Transfer completed successfully",
+          transaction_id: outboundTransaction.id,
+          recipient_name: fakeRecipientName,
+          amount,
+        };
+      });
+
+      return new Response(JSON.stringify(result), {
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (!destinationAccount.is_active) {

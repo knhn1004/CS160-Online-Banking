@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InternalTransfer } from "./internal-transfer";
 import { ExternalTransfer } from "./external-transfer";
+import { BillPay } from "./billpay";
 import { Breadcrumbs } from "./breadcrumbs";
 
 export default function TransfersPage() {
@@ -42,15 +43,19 @@ export default function TransfersPage() {
       <Breadcrumbs />
       <h1 className="mb-6 text-3xl font-bold">Money Transfers</h1>
       <Tabs defaultValue="internal" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="internal">Internal Transfer</TabsTrigger>
           <TabsTrigger value="external">External Transfer</TabsTrigger>
+          <TabsTrigger value="billpay">Bill Pay</TabsTrigger>
         </TabsList>
         <TabsContent value="internal">
           <InternalTransfer />
         </TabsContent>
         <TabsContent value="external">
           <ExternalTransfer />
+        </TabsContent>
+        <TabsContent value="billpay">
+          <BillPay />
         </TabsContent>
       </Tabs>
     </div>

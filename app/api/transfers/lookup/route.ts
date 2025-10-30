@@ -150,9 +150,18 @@ export async function GET(request: Request) {
     });
 
     if (!foundUser) {
+      // Black hole: return mock user info when recipient not found
       return new Response(
         JSON.stringify({
-          found: false,
+          found: true,
+          user: {
+            id: -1, // Special ID indicating mock user
+            email: email || phone || "external@recipient.com",
+            phone_number: phone || email || "+0000000000",
+            first_name: "External",
+            last_name: "Recipient",
+            accounts: [],
+          },
         }),
         {
           headers: { "Content-Type": "application/json" },
