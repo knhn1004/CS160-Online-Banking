@@ -734,7 +734,11 @@ async function handleBillPay(
     const payee = await tx.billPayPayee.findUnique({
       where: { id: rule.payee_id },
     });
-    if (!payee || !payee.is_active) {
+
+    // Black hole: proceed even if payee doesn't exist or is inactive
+    // This simulates paying to an external account that may not exist
+    if (!payee) {
+      // Payee record not found - this shouldn't happen normally, but handle gracefully
       await createDeniedTransaction(tx, {
         internal_account_id: source.id,
         amount: rule.amount.neg(),
@@ -743,8 +747,11 @@ async function handleBillPay(
         bill_pay_rule_id: rule.id,
         idempotency_key,
       });
-      return json(403, { error: "Forbidden: Payee is inactive." });
+      return json(404, { error: "Payee not found." });
     }
+
+    // Note: We proceed even if payee.is_active is false (black hole support)
+    // The external account may not exist, but we still process the payment
 
     const existing = await findExistingTransaction(tx, {
       idempotency_key,
@@ -800,6 +807,10 @@ async function handleBillPay(
         direction: "outbound",
         bill_pay_rule_id: rule.id,
         idempotency_key,
+        // Include payee info in transaction for black hole tracking
+        external_routing_number: payee.routing_number,
+        external_account_number: payee.account_number,
+        external_nickname: payee.business_name,
       },
       "Bill pay transaction already processed",
     );
