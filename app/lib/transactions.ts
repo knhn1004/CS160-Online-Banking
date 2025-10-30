@@ -91,23 +91,33 @@ export async function createApprovedTransaction(
   successMessage: string,
 ) {
   try {
-    await tx.transaction.create({
+    const transaction = await tx.transaction.create({
       data: {
         ...data,
         status: "approved" as const,
       },
     });
-    return { success: true, message: successMessage };
+    return { success: true, message: successMessage, transaction };
   } catch (e) {
     if (
       data.idempotency_key &&
       e instanceof Prisma.PrismaClientKnownRequestError &&
       e.code === "P2002"
     ) {
+      // If duplicate, find the existing transaction
+      const existing = await findExistingTransaction(tx, {
+        idempotency_key: data.idempotency_key,
+        transaction_type: data.transaction_type,
+        internal_account_id: data.internal_account_id,
+        amount: data.amount,
+        bill_pay_rule_id: data.bill_pay_rule_id,
+        transfer_rule_id: data.transfer_rule_id,
+      });
       return {
         success: true,
         message: `${successMessage} (idempotency key found).`,
         duplicate: true,
+        transaction: existing,
       };
     }
     throw e;

@@ -7,6 +7,7 @@
 - NEXT_PUBLIC_SUPABASE_URL
 - NEXT_PUBLIC_SUPABASE_ANON_KEY
 - SUPABASE_SERVICE_ROLE_KEY
+- GROQ_API_KEY
 
 2. Install
 
@@ -102,3 +103,44 @@ To use the ATM locator feature, you need to set up a Google Maps API key:
    ```
 
 **Important**: The API key is used for both server-side API calls and client-side map rendering. Make sure to restrict the API key by domain and specific APIs for security.
+
+9. Groq API Key Setup
+
+To use the check deposit feature, you need to set up a Groq API key:
+
+1. Go to [Groq Console](https://console.groq.com/)
+2. Sign up or log in to your account
+3. Navigate to "API Keys" section
+4. Create a new API key
+5. Add the API key to your `.env` or `.env.local` file:
+   ```
+   GROQ_API_KEY=your_groq_api_key_here
+   ```
+
+The Groq API key is used server-side only for processing check images using the Vision API.
+
+10. Supabase Storage Setup
+
+To use the check deposit feature, you need to create a storage bucket in Supabase:
+
+**Option 1: Using the setup script (Recommended)**
+
+```bash
+pnpm tsx scripts/setup-storage.ts
+```
+
+**Option 2: Manual setup via Supabase Dashboard**
+
+1. Go to your [Supabase Dashboard](https://supabase.com/dashboard)
+2. Navigate to Storage
+3. Click "Create bucket"
+4. Name it `checks`
+5. Make it public (for now, or configure RLS policies if you want private access)
+6. Set allowed MIME types: `image/jpeg`, `image/jpg`, `image/png`, `image/webp`
+7. Set file size limit: `4194304` (4MB)
+
+**Optional: Set up RLS Policies**
+If you want to restrict access so users can only access their own check images:
+
+1. Go to Storage > Policies for the `checks` bucket
+2. Add policies for authenticated users to upload/read files in their own folder (`{auth.uid()}/*`)
