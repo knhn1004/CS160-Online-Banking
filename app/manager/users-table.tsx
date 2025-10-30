@@ -187,7 +187,7 @@ export function UsersTable() {
                   {users.map((user) => (
                     <TableRow
                       key={user.id}
-                      className="cursor-pointer hover:bg-gray-50"
+                      className="cursor-pointer hover:bg-muted/30"
                       onClick={() => handleUserClick(user.id)}
                     >
                       <TableCell className="font-medium">
@@ -195,7 +195,7 @@ export function UsersTable() {
                           <p className="font-semibold">
                             {user.first_name} {user.last_name}
                           </p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-muted-foreground">
                             @{user.username}
                           </p>
                         </div>

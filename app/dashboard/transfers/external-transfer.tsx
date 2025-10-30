@@ -589,7 +589,7 @@ export function ExternalTransfer() {
 
               {lookupError && (
                 <div
-                  className="rounded-md bg-red-50 p-3 text-sm text-red-800"
+                  className="rounded-md bg-destructive/20 border border-destructive/50 p-3 text-sm text-destructive"
                   role="alert"
                 >
                   {lookupError}
@@ -598,7 +598,7 @@ export function ExternalTransfer() {
 
               {lookupResult?.found === false && !lookupLoading && (
                 <div
-                  className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-800"
+                  className="rounded-md bg-warning/20 border border-warning/50 p-3 text-sm text-warning"
                   role="alert"
                 >
                   Recipient not found. Please verify the email or phone number.

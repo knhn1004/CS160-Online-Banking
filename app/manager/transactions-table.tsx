@@ -234,7 +234,10 @@ export function TransactionsTable() {
                 </TableHeader>
                 <TableBody>
                   {transactions.map((transaction) => (
-                    <TableRow key={transaction.id} className="hover:bg-gray-50">
+                    <TableRow
+                      key={transaction.id}
+                      className="hover:bg-muted/30"
+                    >
                       <TableCell className="font-medium">
                         {formatDate(transaction.created_at)}
                       </TableCell>
@@ -244,7 +247,7 @@ export function TransactionsTable() {
                             {transaction.internal_account.user.first_name}{" "}
                             {transaction.internal_account.user.last_name}
                           </p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-muted-foreground">
                             @{transaction.internal_account.user.username}
                           </p>
                         </div>
@@ -253,8 +256,8 @@ export function TransactionsTable() {
                         <span
                           className={
                             transaction.direction === "inbound"
-                              ? "text-green-600"
-                              : "text-red-600"
+                              ? "text-success"
+                              : "text-warning"
                           }
                         >
                           {transaction.direction === "inbound" ? "+" : "-"}
