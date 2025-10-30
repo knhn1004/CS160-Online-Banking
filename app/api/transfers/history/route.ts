@@ -70,6 +70,7 @@ export const revalidate = 0;
  *                         format: date-time
  *                       amount:
  *                         type: integer
+ *                         description: Amount in cents
  *                       status:
  *                         type: string
  *                         enum: [approved, denied]
@@ -263,7 +264,8 @@ export async function GET(request: Request) {
       return {
         id: transaction.id,
         created_at: transaction.created_at.toISOString(),
-        amount: Number(transaction.amount),
+        // Convert amount from dollars to cents for API response
+        amount: Math.round(Number(transaction.amount) * 100),
         status: transaction.status,
         transaction_type: transaction.transaction_type,
         direction: transaction.direction,
