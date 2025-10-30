@@ -7,6 +7,7 @@ import { Profile } from "./profile";
 import { AccountManagement } from "./account-management";
 import { AtmLocator } from "./atm-locator";
 import { DashboardOverview } from "./dashboard-overview";
+import { CheckDeposit } from "./check-deposit";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
@@ -84,6 +85,7 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="account">Account Management</TabsTrigger>
+          <TabsTrigger value="check-deposit">Deposit Check</TabsTrigger>
           <TabsTrigger value="atm">ATM Near Me</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
@@ -97,6 +99,9 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
         </TabsContent>
         <TabsContent value="account">
           <AccountManagement />
+        </TabsContent>
+        <TabsContent value="check-deposit">
+          <CheckDeposit />
         </TabsContent>
         <TabsContent value="atm">
           <AtmLocator />

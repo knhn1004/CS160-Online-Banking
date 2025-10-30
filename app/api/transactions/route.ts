@@ -108,39 +108,64 @@ const TransactionRequestSchema = z.union([
  *                   example: User not onboarded
  */
 export async function GET(request: Request) {
-  const auth = await getAuthUserFromRequest(request);
-  if (!auth.ok) {
-    return new Response(JSON.stringify(auth.body), {
-      headers: { "Content-Type": "application/json" },
-      status: auth.status,
+  try {
+    const auth = await getAuthUserFromRequest(request);
+    if (!auth.ok) {
+      return new Response(JSON.stringify(auth.body), {
+        headers: { "Content-Type": "application/json" },
+        status: auth.status,
+      });
+    }
+
+    const currentUser = await getPrisma().user.findUnique({
+      where: { auth_user_id: auth.supabaseUser.id },
+      include: { internal_accounts: true },
     });
-  }
 
-  const currentUser = await getPrisma().user.findUnique({
-    where: { auth_user_id: auth.supabaseUser.id },
-    include: { internal_accounts: true },
-  });
+    if (!currentUser) {
+      return new Response(JSON.stringify({ message: "User not onboarded" }), {
+        headers: { "Content-Type": "application/json" },
+        status: 404,
+      });
+    }
 
-  if (!currentUser) {
-    return new Response(JSON.stringify({ message: "User not onboarded" }), {
-      headers: { "Content-Type": "application/json" },
-      status: 404,
+    const accountIds = currentUser.internal_accounts.map((acc) => acc.id);
+
+    // Handle case where user has no accounts
+    if (accountIds.length === 0) {
+      return new Response(JSON.stringify({ transactions: [] }), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        },
+      });
+    }
+
+    const transactions = await getPrisma().transaction.findMany({
+      where: { internal_account_id: { in: accountIds } },
+      orderBy: { created_at: "desc" },
+      take: 10,
     });
+
+    return new Response(JSON.stringify({ transactions }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "private, no-cache, no-store, must-revalidate",
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching transactions:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : String(error),
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+        status: 500,
+      },
+    );
   }
-
-  const accountIds = currentUser.internal_accounts.map((acc) => acc.id);
-  const transactions = await getPrisma().transaction.findMany({
-    where: { internal_account_id: { in: accountIds } },
-    orderBy: { created_at: "desc" },
-    take: 10,
-  });
-
-  return new Response(JSON.stringify({ transactions }), {
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "private, no-cache, no-store, must-revalidate",
-    },
-  });
 }
 
 /* ============================================================================================================================
