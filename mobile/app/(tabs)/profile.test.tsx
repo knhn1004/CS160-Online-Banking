@@ -13,6 +13,28 @@ jest.mock("@/lib/api", () => ({
   },
 }));
 
+// Mock TanStack Query to use our mocked API
+jest.mock("@/lib/queries", () => {
+  const { useQuery, useMutation } = require("@tanstack/react-query");
+  const { api } = require("@/lib/api");
+  
+  return {
+    useProfile: () => {
+      return useQuery({
+        queryKey: ["profile"],
+        queryFn: () => api.getProfile(),
+        enabled: true,
+      });
+    },
+    useUpdateProfile: () => {
+      return useMutation({
+        mutationFn: (data: Parameters<typeof api.updateProfile>[0]) =>
+          api.updateProfile(data),
+      });
+    },
+  };
+});
+
 const mockGetProfile = api.getProfile as jest.MockedFunction<
   typeof api.getProfile
 >;
@@ -41,8 +63,12 @@ describe("ProfileScreen", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.clearAllTimers();
     (Toast.show as jest.Mock).mockClear();
+  });
+
+  afterEach(async () => {
+    // Clean up any remaining async operations
+    await new Promise((resolve) => setImmediate(resolve));
   });
 
   it("shows loading state initially", () => {

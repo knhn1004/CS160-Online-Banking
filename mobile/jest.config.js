@@ -15,6 +15,9 @@ module.exports = {
     '!**/scripts/**',
   ],
   coverageDirectory: './coverage',
+  forceExit: true, // Force Jest to exit after all tests complete
+  detectOpenHandles: false, // Disable open handles detection
+  maxWorkers: 1, // Run tests serially to avoid handle conflicts
 };
 
 

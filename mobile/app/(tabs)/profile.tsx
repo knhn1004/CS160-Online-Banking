@@ -83,8 +83,26 @@ export default function ProfileScreen() {
   const colors = Colors[theme];
 
   // Use TanStack Query hooks
-  const { data: profileData, isLoading } = useProfile();
+  const {
+    data: profileData,
+    isLoading,
+    error: profileError,
+  } = useProfile();
   const updateProfileMutation = useUpdateProfile();
+
+  // Show error toast if profile query fails
+  useEffect(() => {
+    if (profileError) {
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2:
+          profileError instanceof Error
+            ? profileError.message
+            : "Failed to load profile",
+      });
+    }
+  }, [profileError]);
 
   // Initialize form with TanStack Form
   const form = useForm({
