@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { Platform } from "react-native";
 import { useTheme } from "@/contexts/theme-context";
 import { Colors } from "@/constants/theme";
 
@@ -11,17 +12,23 @@ export default function HomeLayout() {
       screenOptions={{
         headerShown: false,
         animation: "slide_from_right",
-        ...({ headerBackTitleVisible: false } as any),
+        headerBackTitleVisible: false,
+        headerBackTitle: Platform.OS === "ios" ? "" : undefined,
       }}
     >
-      <Stack.Screen name="index" />
+      <Stack.Screen 
+        name="index" 
+        options={{
+          title: "Home",
+          headerBackTitle: "",
+        }}
+      />
       <Stack.Screen
         name="account-detail"
         options={{
           headerShown: true,
           animation: "slide_from_right",
-          headerBackTitle: "",
-          ...({ headerBackTitleVisible: false } as any),
+          headerBackTitleVisible: false,
         }}
       />
     </Stack>

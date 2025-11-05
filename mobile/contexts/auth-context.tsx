@@ -67,7 +67,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Clear local state immediately to ensure UI updates
+    setUser(null);
+    setSession(null);
+    
+    // Sign out from Supabase (best effort - state already cleared)
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      // Ignore errors - local state is already cleared
+      // The auth state change listener will handle any remaining cleanup
+    }
   };
 
   return (

@@ -20,10 +20,14 @@ const MAPPING = {
   "house.fill": "home",
   "paperplane.fill": "send",
   "chevron.left.forwardslash.chevron.right": "code",
+  "chevron.left": "chevron-left",
   "chevron.right": "chevron-right",
   "arrow.right.circle.fill": "arrow-circle-right",
   "doc.on.doc": "content-copy",
   "map.fill": "map",
+  "person.fill": "person",
+  "gearshape.fill": "settings",
+  "arrow.right.square": "exit-to-app",
 } as IconMapping;
 
 /**
@@ -43,11 +47,26 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
+  const iconName = MAPPING[name];
+  
+  if (!iconName) {
+    console.warn(`Icon "${name}" not found in mapping. Available icons: ${Object.keys(MAPPING).join(", ")}`);
+    // Fallback to a default icon
+    return (
+      <MaterialIcons
+        color={color}
+        size={size}
+        name="help-outline"
+        style={style}
+      />
+    );
+  }
+
   return (
     <MaterialIcons
       color={color}
       size={size}
-      name={MAPPING[name]}
+      name={iconName}
       style={style}
     />
   );

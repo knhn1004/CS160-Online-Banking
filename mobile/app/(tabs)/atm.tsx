@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -20,6 +20,7 @@ import { useTheme } from "@/contexts/theme-context";
 import { Colors } from "@/constants/theme";
 import { searchNearbyATMs, geocodeAddress, type AtmLocation } from "@/lib/atm";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { GoogleMapsWebView } from "@/components/maps/google-maps-webview";
 
 export default function AtmLocatorScreen() {
   const { theme } = useTheme();
@@ -34,11 +35,26 @@ export default function AtmLocatorScreen() {
   } | null>(null);
   const [searchAddress, setSearchAddress] = useState("");
   const [selectedAtm, setSelectedAtm] = useState<AtmLocation | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const cardPositions = useRef<{ [key: string]: number }>({});
 
   // Request user's current location on mount
   useEffect(() => {
     requestLocation();
   }, []);
+
+  // Scroll to selected ATM card when it changes
+  useEffect(() => {
+    if (selectedAtm && scrollViewRef.current) {
+      const cardY = cardPositions.current[selectedAtm.place_id];
+      if (cardY !== undefined) {
+        scrollViewRef.current.scrollTo({
+          y: cardY - 20, // Add some padding
+          animated: true,
+        });
+      }
+    }
+  }, [selectedAtm]);
 
   const requestLocation = useCallback(async () => {
     try {
@@ -119,6 +135,8 @@ export default function AtmLocatorScreen() {
       setLoading(true);
       setError(null);
       const result = await geocodeAddress(searchAddress);
+      const coords = { lat: result.lat, lng: result.lng };
+      setUserLocation(coords);
       await searchATMs(result.lat, result.lng);
     } catch (err) {
       const errorMessage =
@@ -306,16 +324,37 @@ export default function AtmLocatorScreen() {
         </View>
       )}
 
-      {/* ATM List */}
+      {/* Map and ATM List */}
       {!loading && !error && atms.length > 0 && (
-        <View style={styles.listContainer}>
-          <ThemedText type="subtitle" style={styles.listTitle}>
-            Nearby ATMs ({atms.length})
-          </ThemedText>
-          <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+        <View style={styles.contentContainer}>
+          {/* Map View */}
+          <View style={styles.mapContainer}>
+            <GoogleMapsWebView
+              userLocation={userLocation}
+              atms={atms}
+              selectedAtm={selectedAtm}
+              onMarkerPress={(atm) => setSelectedAtm(atm)}
+              theme={theme}
+            />
+          </View>
+
+          {/* ATM List */}
+          <View style={styles.listContainer}>
+            <ThemedText type="subtitle" style={styles.listTitle}>
+              Nearby ATMs ({atms.length})
+            </ThemedText>
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.list}
+              showsVerticalScrollIndicator={false}
+            >
             {atms.map((atm) => (
               <TouchableOpacity
                 key={atm.place_id}
+                onLayout={(event) => {
+                  const { y } = event.nativeEvent.layout;
+                  cardPositions.current[atm.place_id] = y;
+                }}
                 style={[
                   styles.atmCard,
                   { backgroundColor: colors.card, borderColor: colors.border },
@@ -389,7 +428,8 @@ export default function AtmLocatorScreen() {
                 </TouchableOpacity>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
       )}
 
@@ -468,6 +508,15 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 14,
     textAlign: "center",
+  },
+  contentContainer: {
+    flex: 1,
+    flexDirection: "column",
+  },
+  mapContainer: {
+    height: 300,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
   },
   listContainer: {
     flex: 1,

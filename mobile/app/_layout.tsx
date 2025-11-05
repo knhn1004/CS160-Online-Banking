@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { ThemeProvider, useTheme } from "@/contexts/theme-context";
 import { Colors } from "@/constants/theme";
 import { ToastProvider } from "@/components/ui/alert-dialog";
+import { api } from "@/lib/api";
 
 export const unstable_settings = {
   initialRouteName: "(auth)",
@@ -19,9 +20,17 @@ export const unstable_settings = {
 
 function RootLayoutNav() {
   const { theme } = useTheme();
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  // Set up unauthorized handler to trigger logout on 401 errors
+  useEffect(() => {
+    api.setUnauthorizedHandler(async () => {
+      await signOut();
+      router.replace("/(auth)/login");
+    });
+  }, [signOut, router]);
 
   useEffect(() => {
     if (loading) return;

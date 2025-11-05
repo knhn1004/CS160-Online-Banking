@@ -90,6 +90,14 @@ jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(),
 }));
 
+jest.mock('expo-constants', () => ({
+  default: {
+    expoConfig: {
+      extra: {},
+    },
+  },
+}));
+
 jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn().mockResolvedValue({
     status: 'granted',
@@ -100,5 +108,21 @@ jest.mock('expo-location', () => ({
       longitude: -122.4194,
     },
   }),
+  Accuracy: {
+    High: 'high',
+  },
 }));
+
+jest.mock('react-native-webview', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    WebView: React.forwardRef((props: any, ref: any) => {
+      React.useImperativeHandle(ref, () => ({
+        injectJavaScript: jest.fn(),
+      }));
+      return <View testID="webview" {...props} />;
+    }),
+  };
+});
 

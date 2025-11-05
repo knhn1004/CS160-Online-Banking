@@ -106,15 +106,9 @@ export default function AccountDetailScreen() {
             title: "Account Details",
             headerShown: true,
             headerBackTitle: "",
-            ...({ headerBackTitleVisible: false } as any),
-            headerLeft: () => (
-              <TouchableOpacity
-                onPress={() => router.back()}
-                style={{ marginLeft: 16 }}
-              >
-                <IconSymbol name="chevron.left" size={24} color={colors.text} />
-              </TouchableOpacity>
-            ),
+            headerBackTitleVisible: false,
+            headerTintColor: colors.text,
+            headerBackVisible: true,
           }}
         />
         <ActivityIndicator size="large" />
@@ -131,15 +125,9 @@ export default function AccountDetailScreen() {
             title: "Account Details",
             headerShown: true,
             headerBackTitle: "",
-            ...({ headerBackTitleVisible: false } as any),
-            headerLeft: () => (
-              <TouchableOpacity
-                onPress={() => router.back()}
-                style={{ marginLeft: 16 }}
-              >
-                <IconSymbol name="chevron.left" size={24} color={colors.text} />
-              </TouchableOpacity>
-            ),
+            headerBackTitleVisible: false,
+            headerTintColor: colors.text,
+            headerBackVisible: true,
           }}
         />
         <ThemedView
@@ -170,15 +158,9 @@ export default function AccountDetailScreen() {
           title: `${accountType} Account`,
           headerShown: true,
           headerBackTitle: "",
-          ...({ headerBackTitleVisible: false } as any),
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{ marginLeft: 16 }}
-            >
-              <IconSymbol name="chevron.left" size={24} color={colors.text} />
-            </TouchableOpacity>
-          ),
+          headerBackTitleVisible: false,
+          headerTintColor: colors.text,
+          headerBackVisible: true,
         }}
       />
 
