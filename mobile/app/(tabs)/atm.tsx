@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -20,6 +20,7 @@ import { useTheme } from "@/contexts/theme-context";
 import { Colors } from "@/constants/theme";
 import { searchNearbyATMs, geocodeAddress, type AtmLocation } from "@/lib/atm";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { GoogleMapsWebView } from "@/components/maps/google-maps-webview";
 
 export default function AtmLocatorScreen() {
   const { theme } = useTheme();
@@ -34,10 +35,35 @@ export default function AtmLocatorScreen() {
   } | null>(null);
   const [searchAddress, setSearchAddress] = useState("");
   const [selectedAtm, setSelectedAtm] = useState<AtmLocation | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const cardPositions = useRef<{ [key: string]: number }>({});
 
-  // Request user's current location on mount
-  useEffect(() => {
-    requestLocation();
+  const searchATMs = useCallback(async (lat: number, lng: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const results = await searchNearbyATMs(lat, lng);
+      setAtms(results);
+
+      if (results.length === 0) {
+        Toast.show({
+          type: "info",
+          text1: "No ATMs Found",
+          text2: "No Chase ATMs found in this area",
+        });
+      }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to search for ATMs";
+      setError(errorMessage);
+      Toast.show({
+        type: "error",
+        text1: "Search Error",
+        text2: errorMessage,
+      });
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const requestLocation = useCallback(async () => {
@@ -75,37 +101,14 @@ export default function AtmLocatorScreen() {
       });
       setLoading(false);
     }
-  }, []);
+  }, [searchATMs]);
 
-  const searchATMs = async (lat: number, lng: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const results = await searchNearbyATMs(lat, lng);
-      setAtms(results);
+  // Request user's current location on mount
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
 
-      if (results.length === 0) {
-        Toast.show({
-          type: "info",
-          text1: "No ATMs Found",
-          text2: "No Chase ATMs found in this area",
-        });
-      }
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to search for ATMs";
-      setError(errorMessage);
-      Toast.show({
-        type: "error",
-        text1: "Search Error",
-        text2: errorMessage,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddressSearch = async () => {
+  const handleAddressSearch = useCallback(async () => {
     if (!searchAddress.trim()) {
       Toast.show({
         type: "error",
@@ -119,6 +122,8 @@ export default function AtmLocatorScreen() {
       setLoading(true);
       setError(null);
       const result = await geocodeAddress(searchAddress);
+      const coords = { lat: result.lat, lng: result.lng };
+      setUserLocation(coords);
       await searchATMs(result.lat, result.lng);
     } catch (err) {
       const errorMessage =
@@ -131,7 +136,7 @@ export default function AtmLocatorScreen() {
       });
       setLoading(false);
     }
-  };
+  }, [searchATMs, searchAddress]);
 
   const formatDistance = (distance?: number) => {
     if (!distance) return "Unknown distance";
@@ -142,7 +147,6 @@ export default function AtmLocatorScreen() {
   const openInMaps = (atm: AtmLocation) => {
     const { lat, lng } = atm.geometry.location;
     const name = encodeURIComponent(atm.name);
-    const address = encodeURIComponent(atm.vicinity);
 
     const appleMapsUrl = `http://maps.apple.com/?q=${name}&ll=${lat},${lng}`;
     const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
@@ -306,16 +310,37 @@ export default function AtmLocatorScreen() {
         </View>
       )}
 
-      {/* ATM List */}
+      {/* Map and ATM List */}
       {!loading && !error && atms.length > 0 && (
-        <View style={styles.listContainer}>
-          <ThemedText type="subtitle" style={styles.listTitle}>
-            Nearby ATMs ({atms.length})
-          </ThemedText>
-          <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+        <View style={styles.contentContainer}>
+          {/* Map View */}
+          <View style={styles.mapContainer}>
+            <GoogleMapsWebView
+              userLocation={userLocation}
+              atms={atms}
+              selectedAtm={selectedAtm}
+              onMarkerPress={(atm) => setSelectedAtm(atm)}
+              theme={theme}
+            />
+          </View>
+
+          {/* ATM List */}
+          <View style={styles.listContainer}>
+            <ThemedText type="subtitle" style={styles.listTitle}>
+              Nearby ATMs ({atms.length})
+            </ThemedText>
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.list}
+              showsVerticalScrollIndicator={false}
+            >
             {atms.map((atm) => (
               <TouchableOpacity
                 key={atm.place_id}
+                onLayout={(event) => {
+                  const { y } = event.nativeEvent.layout;
+                  cardPositions.current[atm.place_id] = y;
+                }}
                 style={[
                   styles.atmCard,
                   { backgroundColor: colors.card, borderColor: colors.border },
@@ -389,7 +414,8 @@ export default function AtmLocatorScreen() {
                 </TouchableOpacity>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
       )}
 
@@ -468,6 +494,15 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 14,
     textAlign: "center",
+  },
+  contentContainer: {
+    flex: 1,
+    flexDirection: "column",
+  },
+  mapContainer: {
+    height: 300,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
   },
   listContainer: {
     flex: 1,

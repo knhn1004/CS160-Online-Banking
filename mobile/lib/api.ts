@@ -1,10 +1,23 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 import { supabase } from "./supabase";
+
+// Determine the correct API URL based on platform and environment
+const getDefaultApiUrl = () => {
+  if (Platform.OS === "android") {
+    // Android emulator uses 10.0.2.2 to access host machine's localhost
+    // For physical devices, set EXPO_PUBLIC_API_URL in .env to your computer's IP
+    return "http://10.0.2.2:3000";
+  }
+  
+  // iOS uses localhost (works for simulator and physical device via USB)
+  return "http://localhost:3000";
+};
 
 const API_URL =
   Constants.expoConfig?.extra?.apiUrl ||
   process.env.EXPO_PUBLIC_API_URL ||
-  "http://localhost:3000";
+  getDefaultApiUrl();
 
 export interface InternalAccount {
   id: number;
@@ -49,6 +62,13 @@ export interface ApiError {
 }
 
 class ApiClient {
+  private onUnauthorizedCallback?: () => void;
+
+  // Set callback for handling unauthorized errors
+  setUnauthorizedHandler(callback: () => void) {
+    this.onUnauthorizedCallback = callback;
+  }
+
   private async getAuthToken(): Promise<string | null> {
     const {
       data: { session },
@@ -76,6 +96,13 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      // Handle 401 Unauthorized - trigger logout
+      if (response.status === 401) {
+        if (this.onUnauthorizedCallback) {
+          this.onUnauthorizedCallback();
+        }
+      }
+
       const error: ApiError = await response.json().catch(() => ({
         message: `HTTP error! status: ${response.status}`,
       }));
