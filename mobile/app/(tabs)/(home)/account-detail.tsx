@@ -106,7 +106,7 @@ export default function AccountDetailScreen() {
             title: "Account Details",
             headerShown: true,
             headerBackTitle: "",
-            headerBackTitleVisible: false,
+            ...({ headerBackTitleVisible: false } as any),
             headerLeft: () => (
               <TouchableOpacity
                 onPress={() => router.back()}
@@ -131,7 +131,7 @@ export default function AccountDetailScreen() {
             title: "Account Details",
             headerShown: true,
             headerBackTitle: "",
-            headerBackTitleVisible: false,
+            ...({ headerBackTitleVisible: false } as any),
             headerLeft: () => (
               <TouchableOpacity
                 onPress={() => router.back()}
@@ -170,7 +170,7 @@ export default function AccountDetailScreen() {
           title: `${accountType} Account`,
           headerShown: true,
           headerBackTitle: "",
-          headerBackTitleVisible: false,
+          ...({ headerBackTitleVisible: false } as any),
           headerLeft: () => (
             <TouchableOpacity
               onPress={() => router.back()}

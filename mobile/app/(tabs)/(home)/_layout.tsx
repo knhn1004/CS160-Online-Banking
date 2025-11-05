@@ -11,7 +11,7 @@ export default function HomeLayout() {
       screenOptions={{
         headerShown: false,
         animation: "slide_from_right",
-        headerBackTitleVisible: false,
+        ...({ headerBackTitleVisible: false } as any),
       }}
     >
       <Stack.Screen name="index" />
@@ -21,7 +21,7 @@ export default function HomeLayout() {
           headerShown: true,
           animation: "slide_from_right",
           headerBackTitle: "",
-          headerBackTitleVisible: false,
+          ...({ headerBackTitleVisible: false } as any),
         }}
       />
     </Stack>

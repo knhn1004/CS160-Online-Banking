@@ -16,15 +16,18 @@ export function FloatingTab(props: BottomTabBarButtonProps) {
   return (
     <View style={styles.wrapper}>
       <PlatformPressable
-        {...props}
-        style={({ pressed }) => [
-          styles.button,
-          {
-            backgroundColor: colors.primary,
-            zIndex: 2,
-          } as ViewStyle,
-          pressed && styles.pressed,
-        ]}
+        {...(props as any)}
+        style={({ pressed }: { pressed: boolean }) => {
+          const styleArray = [
+            styles.button,
+            {
+              backgroundColor: colors.primary,
+              zIndex: 2,
+            } as ViewStyle,
+            pressed && styles.pressed,
+          ].filter(Boolean);
+          return styleArray as any;
+        }}
         onPressIn={(ev) => {
           if (process.env.EXPO_OS === "ios") {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
