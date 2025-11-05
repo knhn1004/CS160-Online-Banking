@@ -1,98 +1,222 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { View, StyleSheet, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import { useState, useEffect } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { api, type InternalAccount, type Transaction } from '@/lib/api';
+import { BalanceCard } from '@/components/dashboard/balance-card';
+import { AccountCard } from '@/components/dashboard/account-card';
+import { TransactionItem } from '@/components/dashboard/transaction-item';
 
-export default function HomeScreen() {
+interface DashboardData {
+  accounts: InternalAccount[];
+  transactions: Transaction[];
+  totalBalance: number;
+}
+
+export default function DashboardScreen() {
+  const insets = useSafeAreaInsets();
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadData = async () => {
+    try {
+      setError(null);
+      const [accountsRes, transactionsRes] = await Promise.all([
+        api.getAccounts(),
+        api.getTransactions(5),
+      ]);
+
+      const totalBalance = accountsRes.accounts.reduce((sum, acc) => sum + acc.balance, 0);
+
+      setData({
+        accounts: accountsRes.accounts,
+        transactions: transactionsRes.transactions,
+        totalBalance,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
+
+  if (loading && !data) {
+    return (
+      <ThemedView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+        <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+      </ThemedView>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <ThemedView style={[styles.container, { paddingTop: insets.top + 16 }]}>
+      <View style={styles.content}>
+        {error && (
+          <ThemedView style={styles.errorContainer}>
+            <ThemedText style={styles.errorText}>{error}</ThemedText>
+          </ThemedView>
+        )}
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        {/* Summary Cards */}
+        <View style={styles.summaryRow}>
+          <BalanceCard balance={data?.totalBalance || 0} />
+          <View style={styles.activeAccountsCard}>
+            <ThemedText style={styles.cardLabel}>Active Accounts</ThemedText>
+            <ThemedText style={styles.cardValue}>
+              {data?.accounts.filter((acc) => acc.is_active).length || 0}
+            </ThemedText>
+          </View>
+        </View>
+
+        {/* Accounts Overview */}
+        <View style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Your Accounts
+          </ThemedText>
+          {!data || data.accounts.length === 0 ? (
+            <ThemedView style={styles.emptyContainer}>
+              <ThemedText style={styles.emptyText}>No accounts found</ThemedText>
+            </ThemedView>
+          ) : (
+            <View style={styles.accountsList}>
+              {data.accounts.map((account, index) => (
+                <View key={account.id} style={index > 0 && { marginTop: 12 }}>
+                  <AccountCard account={account} />
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Recent Activity */}
+        <View style={styles.recentActivityContainer}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Recent Activity
+          </ThemedText>
+          {!data || data.transactions.length === 0 ? (
+            <ThemedView style={styles.emptyContainer}>
+              <ThemedText style={styles.emptyText}>No recent transactions</ThemedText>
+            </ThemedView>
+          ) : (
+            <ScrollView
+              style={styles.transactionsScrollView}
+              contentContainerStyle={styles.transactionsList}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+              showsVerticalScrollIndicator={true}>
+              {data.transactions.map((transaction, index) => {
+                const account = data.accounts.find(
+                  (acc) => acc.id === transaction.internal_account_id
+                );
+                return (
+                  <View key={transaction.id} style={index > 0 && { marginTop: 8 }}>
+                    <TransactionItem
+                      transaction={transaction}
+                      accountNumber={account?.account_number || ''}
+                    />
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
   },
-  stepContainer: {
-    gap: 8,
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    marginTop: 16,
+  },
+  errorContainer: {
+    backgroundColor: '#fee2e2',
+    borderColor: '#ef4444',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 14,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  activeAccountsCard: {
+    flex: 1,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e0e7ff',
+    marginLeft: 12,
+    minHeight: 80,
+  },
+  cardLabel: {
+    fontSize: 14,
+    opacity: 0.7,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  cardValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    lineHeight: 32,
+  },
+  section: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    marginBottom: 8,
+  },
+  accountsList: {
+    marginTop: 8,
+  },
+  recentActivityContainer: {
+    flex: 1,
+    marginTop: 8,
+  },
+  transactionsScrollView: {
+    flex: 1,
+  },
+  transactionsList: {
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  emptyContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  emptyText: {
+    opacity: 0.6,
+    fontSize: 14,
   },
 });
