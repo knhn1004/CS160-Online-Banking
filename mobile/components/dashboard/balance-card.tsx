@@ -1,25 +1,38 @@
-import { StyleSheet } from 'react-native';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { StyleSheet } from "react-native";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { useTheme } from "@/contexts/theme-context";
+import { Colors } from "@/constants/theme";
 
 interface BalanceCardProps {
   balance: number;
 }
 
 export function BalanceCard({ balance }: BalanceCardProps) {
+  const { theme } = useTheme();
+  const colors = Colors[theme];
+
   const formatCurrency = (amount: number) => {
-    // Balance is in cents, convert to dollars
-    const dollars = amount / 100;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(dollars);
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount);
   };
 
   return (
-    <ThemedView style={styles.card}>
+    <ThemedView
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme === "dark" ? colors.success + "20" : "#f0fdf4",
+          borderColor: theme === "dark" ? colors.success + "40" : "#d1fae5",
+        },
+      ]}
+    >
       <ThemedText style={styles.label}>Total Balance</ThemedText>
-      <ThemedText style={styles.balance}>{formatCurrency(balance)}</ThemedText>
+      <ThemedText style={[styles.balance, { color: colors.success }]}>
+        {formatCurrency(balance)}
+      </ThemedText>
     </ThemedView>
   );
 }
@@ -27,11 +40,9 @@ export function BalanceCard({ balance }: BalanceCardProps) {
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: '#f0fdf4',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#d1fae5',
     minHeight: 80,
   },
   label: {
@@ -41,9 +52,7 @@ const styles = StyleSheet.create({
   },
   balance: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#16a34a',
+    fontWeight: "bold",
     lineHeight: 36,
   },
 });
-
