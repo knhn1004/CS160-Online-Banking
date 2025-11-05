@@ -18,7 +18,8 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useTheme } from "@/contexts/theme-context";
 import { Colors } from "@/constants/theme";
-import { searchNearbyATMs, geocodeAddress, type AtmLocation } from "@/lib/atm";
+import { searchNearbyATMs, geocodeAddress } from "@/lib/atm";
+import type { AtmLocation } from "@/lib/types";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { GoogleMapsWebView } from "@/components/maps/google-maps-webview";
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, Text } from "react-native";
 import { WebView } from "react-native-webview";
 import Constants from "expo-constants";
-import type { AtmLocation } from "@/lib/atm";
+import type { AtmLocation } from "@/lib/types";
 
 interface GoogleMapsWebViewProps {
   userLocation: { lat: number; lng: number } | null;

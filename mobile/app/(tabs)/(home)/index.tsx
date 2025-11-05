@@ -5,76 +5,61 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useTheme } from "@/contexts/theme-context";
 import { Colors } from "@/constants/theme";
-import {
-  api,
-  type InternalAccount,
-  type Transaction,
-  type UserProfile,
-} from "@/lib/api";
+import { useAccounts, useTransactions, useProfile } from "@/lib/queries";
 import { BalanceCard } from "@/components/dashboard/balance-card";
 import { AccountCard } from "@/components/dashboard/account-card";
 import { TransactionItem } from "@/components/dashboard/transaction-item";
-
-interface DashboardData {
-  accounts: InternalAccount[];
-  transactions: Transaction[];
-  totalBalance: number;
-  userProfile: UserProfile | null;
-}
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const colors = Colors[theme];
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadData = async () => {
-    try {
-      setError(null);
-      const [accountsRes, transactionsRes, profileRes] = await Promise.all([
-        api.getAccounts(),
-        api.getTransactions(5),
-        api.getProfile().catch(() => ({ user: null })),
-      ]);
+  // Use TanStack Query hooks
+  const {
+    data: accountsData,
+    isLoading: accountsLoading,
+    refetch: refetchAccounts,
+  } = useAccounts();
+  const {
+    data: transactionsData,
+    isLoading: transactionsLoading,
+    refetch: refetchTransactions,
+  } = useTransactions(5);
+  const {
+    data: profileData,
+    isLoading: profileLoading,
+    refetch: refetchProfile,
+  } = useProfile();
 
-      const totalBalance = accountsRes.accounts.reduce(
-        (sum, acc) => sum + acc.balance,
-        0,
-      );
+  const accounts = useMemo(
+    () => accountsData?.accounts || [],
+    [accountsData?.accounts],
+  );
+  const transactions = transactionsData?.transactions || [];
+  const userProfile = profileData?.user || null;
 
-      setData({
-        accounts: accountsRes.accounts,
-        transactions: transactionsRes.transactions,
-        totalBalance,
-        userProfile: profileRes.user,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  const isLoading = accountsLoading || transactionsLoading || profileLoading;
+  const isRefreshing = false; // TanStack Query handles this internally
 
   const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
+    refetchAccounts();
+    refetchTransactions();
+    refetchProfile();
   };
 
-  if (loading && !data) {
+  const totalBalance = useMemo(
+    () => accounts.reduce((sum, acc) => sum + acc.balance, 0),
+    [accounts],
+  );
+
+  if (isLoading && accounts.length === 0) {
     return (
       <ThemedView style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
@@ -91,8 +76,8 @@ export default function DashboardScreen() {
   };
 
   const getUserDisplayName = () => {
-    if (!data?.userProfile) return "";
-    const { first_name, last_name } = data.userProfile;
+    if (!userProfile) return "";
+    const { first_name, last_name } = userProfile;
     return `${first_name} ${last_name}`.trim();
   };
 
@@ -110,7 +95,7 @@ export default function DashboardScreen() {
         {/* Greeting Section */}
         <View style={styles.greetingSection}>
           <ThemedText style={styles.greeting}>{getGreeting()}</ThemedText>
-          {data?.userProfile && (
+          {userProfile && (
             <ThemedText
               style={[
                 styles.userName,
@@ -124,15 +109,9 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {error && (
-          <ThemedView style={styles.errorContainer}>
-            <ThemedText style={styles.errorText}>{error}</ThemedText>
-          </ThemedView>
-        )}
-
         {/* Summary Cards */}
         <View style={styles.summaryRow}>
-          <BalanceCard balance={data?.totalBalance || 0} />
+          <BalanceCard balance={totalBalance} />
           <View
             style={[
               styles.activeAccountsCard,
@@ -146,7 +125,7 @@ export default function DashboardScreen() {
           >
             <ThemedText style={styles.cardLabel}>Active Accounts</ThemedText>
             <ThemedText style={styles.cardValue}>
-              {data?.accounts.filter((acc) => acc.is_active).length || 0}
+              {accounts.filter((acc) => acc.is_active).length}
             </ThemedText>
           </View>
         </View>
@@ -156,7 +135,7 @@ export default function DashboardScreen() {
           <ThemedText type="subtitle" style={styles.sectionTitle}>
             Your Accounts
           </ThemedText>
-          {!data || data.accounts.length === 0 ? (
+          {accounts.length === 0 ? (
             <ThemedView style={styles.emptyContainer}>
               <ThemedText style={styles.emptyText}>
                 No accounts found
@@ -164,7 +143,7 @@ export default function DashboardScreen() {
             </ThemedView>
           ) : (
             <View style={styles.accountsList}>
-              {data.accounts.map((account, index) => (
+              {accounts.map((account, index) => (
                 <View key={account.id} style={index > 0 && { marginTop: 12 }}>
                   <AccountCard account={account} />
                 </View>
@@ -178,7 +157,7 @@ export default function DashboardScreen() {
           <ThemedText type="subtitle" style={styles.sectionTitle}>
             Recent Activity
           </ThemedText>
-          {!data || data.transactions.length === 0 ? (
+          {transactions.length === 0 ? (
             <ThemedView style={styles.emptyContainer}>
               <ThemedText style={styles.emptyText}>
                 No recent transactions
@@ -189,12 +168,15 @@ export default function DashboardScreen() {
               style={styles.transactionsScrollView}
               contentContainerStyle={styles.transactionsList}
               refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={onRefresh}
+                />
               }
               showsVerticalScrollIndicator={true}
             >
-              {data.transactions.map((transaction, index) => {
-                const account = data.accounts.find(
+              {transactions.map((transaction, index) => {
+                const account = accounts.find(
                   (acc) => acc.id === transaction.internal_account_id,
                 );
                 return (

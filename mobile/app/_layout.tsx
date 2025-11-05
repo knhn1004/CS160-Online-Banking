@@ -7,12 +7,24 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { ThemeProvider, useTheme } from "@/contexts/theme-context";
 import { Colors } from "@/constants/theme";
 import { ToastProvider } from "@/components/ui/alert-dialog";
 import { api } from "@/lib/api";
+
+// Create a query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30 * 1000, // 30 seconds
+      gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
+    },
+  },
+});
 
 export const unstable_settings = {
   initialRouteName: "(auth)",
@@ -86,13 +98,15 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <ToastProvider>
-          <AuthProvider>
-            <RootLayoutNav />
-          </AuthProvider>
-        </ToastProvider>
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <RootLayoutNav />
+            </AuthProvider>
+          </ToastProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </SafeAreaProvider>
   );
 }

@@ -5,6 +5,7 @@
 const originalError = console.error;
 beforeAll(() => {
   console.error = (...args) => {
+    // Suppress React act() warnings
     if (
       typeof args[0] === 'string' &&
       args[0].includes('An update to') &&
@@ -12,7 +13,17 @@ beforeAll(() => {
     ) {
       return;
     }
-    originalError.call(console, ...args);
+    // Suppress expected ATM API errors during tests
+    if (
+      (typeof args[0] === 'string' && args[0].includes('Error searching for ATMs')) ||
+      (typeof args[0] === 'string' && args[0].includes('Error geocoding address')) ||
+      (args.length > 1 && typeof args[1] === 'string' && args[1].includes('Error searching for ATMs')) ||
+      (args.length > 1 && typeof args[1] === 'string' && args[1].includes('Error geocoding address'))
+    ) {
+      return;
+    }
+    // Call original error handler with proper context
+    originalError.apply(console, args);
   };
 });
 
@@ -125,4 +136,3 @@ jest.mock('react-native-webview', () => {
     }),
   };
 });
-

@@ -2,3 +2,4 @@
 alwaysApply: true
 ---
 need to run pnpm lint, pnpm typecheck, pnpm test to ensure code works
+when working with mobile, run those under the mobile/ dir
