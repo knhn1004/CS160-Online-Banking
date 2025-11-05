@@ -16,7 +16,8 @@ function getGroqClient() {
 
 // Schema for extracted check data
 export const CheckDataSchema = z.object({
-  amount: z.number().positive("Amount must be positive"),
+  is_check: z.boolean().optional().default(true), // Verify this is actually a check
+  amount: z.number().positive("Amount must be positive").optional(),
   routing_number: z
     .union([z.string(), z.number()])
     .optional()
@@ -32,12 +33,24 @@ export const CheckDataSchema = z.object({
   payee_name: z.string().optional(),
   payor_name: z.string().optional(),
   date: z.string().optional(),
+  rejection_reason: z.string().optional(), // Reason if not a check
 });
 
 export type CheckData = z.infer<typeof CheckDataSchema>;
 
+// Clean check data type (without validation fields)
+export type ExtractedCheckData = {
+  amount: number;
+  routing_number?: string;
+  account_number?: string;
+  check_number?: string;
+  payee_name?: string;
+  payor_name?: string;
+  date?: string;
+};
+
 export type CheckExtractionResult =
-  | { success: true; data: CheckData }
+  | { success: true; data: ExtractedCheckData }
   | { success: false; error: string };
 
 /**
@@ -62,7 +75,25 @@ export async function extractCheckData(
     // Create client lazily
     const client = getGroqClient();
 
-    const prompt = `Analyze this check image and extract the following information as a JSON object:
+    const prompt = `You are analyzing an image to determine if it is a bank check. CRITICAL: First verify that this image is actually a check.
+
+A valid check should have:
+- Check-like formatting (typically rectangular with standard check layout)
+- Bank routing information (MICR line at bottom or routing number visible)
+- Payee line ("Pay to the order of")
+- Amount field (both written and numeric)
+- Signature line
+- Bank name/logo
+- Account holder information
+
+If this image is NOT a check (e.g., random photo, document, screenshot, meme, etc.), return:
+{
+  "is_check": false,
+  "rejection_reason": "Brief explanation of why this is not a check (e.g., 'This appears to be a random photo, not a bank check')"
+}
+
+If this IS a valid check, extract the following information as a JSON object:
+- is_check: true
 - amount: The dollar amount written on the check (as a number, e.g., 100.50 for $100.50)
 - routing_number: The 9-digit routing number if visible (as a string)
 - account_number: The account number if visible (as a string)
@@ -134,9 +165,37 @@ Return ONLY a valid JSON object with these fields. If a field is not visible or 
       };
     }
 
+    const validatedData = validationResult.data;
+
+    // Check if this is actually a check
+    if (validatedData.is_check === false) {
+      return {
+        success: false,
+        error:
+          validatedData.rejection_reason ||
+          "This image does not appear to be a valid bank check",
+      };
+    }
+
+    // Ensure amount exists for valid checks
+    if (!validatedData.amount || validatedData.amount <= 0) {
+      return {
+        success: false,
+        error: "Could not extract a valid amount from the check",
+      };
+    }
+
     return {
       success: true,
-      data: validationResult.data,
+      data: {
+        amount: validatedData.amount,
+        routing_number: validatedData.routing_number,
+        account_number: validatedData.account_number,
+        check_number: validatedData.check_number,
+        payee_name: validatedData.payee_name,
+        payor_name: validatedData.payor_name,
+        date: validatedData.date,
+      },
     };
   } catch (error) {
     // Better error handling for API errors

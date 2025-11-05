@@ -20,13 +20,15 @@ export const ALLOWED_MIME_TYPES = [
  * Upload check image to Supabase Storage
  * @param file - The image file to upload
  * @param userId - The authenticated user's ID
+ * @param authorizationHeader - Optional authorization header for Supabase client
  * @returns The public URL of the uploaded image
  */
 export async function uploadCheckToSupabase(
   file: File,
   userId: string,
+  authorizationHeader?: string,
 ): Promise<{ url: string; path: string }> {
-  const supabase = await createClient();
+  const supabase = await createClient(authorizationHeader);
 
   // Generate unique filename
   const timestamp = Date.now();

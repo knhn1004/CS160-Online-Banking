@@ -103,12 +103,12 @@ class ApiClient {
         }
       }
 
-      const error: ApiError = await response.json().catch(() => ({
+      const error: ApiError & { error?: string; message?: string } = await response.json().catch(() => ({
         message: `HTTP error! status: ${response.status}`,
       }));
-      throw new Error(
-        error.message || `HTTP error! status: ${response.status}`,
-      );
+      // Prefer message field, fall back to error field, then ApiError.message
+      const errorMessage = error.message || error.error || `HTTP error! status: ${response.status}`;
+      throw new Error(errorMessage);
     }
 
     return response.json();
@@ -183,6 +183,405 @@ class ApiClient {
     return this.request<{ user: UserProfile }>("/api/users/onboard", {
       method: "POST",
       body: JSON.stringify(data),
+    });
+  }
+
+  // Transfer API methods
+  async transferInternal(data: {
+    source_account_id: number;
+    destination_account_id: number;
+    amount: string; // Amount as string (e.g., "100.50")
+  }): Promise<{
+    success: boolean;
+    message: string;
+    transaction_id: number;
+    amount: number;
+  }> {
+    return this.request<{
+      success: boolean;
+      message: string;
+      transaction_id: number;
+      amount: number;
+    }>("/api/transfers/internal", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async transferExternal(data: {
+    source_account_id: number;
+    amount: string; // Amount as string
+    recipient_email?: string;
+    recipient_phone?: string;
+    destination_account_id?: number;
+  }): Promise<{
+    success: boolean;
+    message: string;
+    transaction_id: number;
+    amount: number;
+    recipient_name: string;
+  }> {
+    return this.request<{
+      success: boolean;
+      message: string;
+      transaction_id: number;
+      amount: number;
+      recipient_name: string;
+    }>("/api/transfers/external", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async lookupRecipient(params: {
+    email?: string;
+    phone?: string;
+  }): Promise<{
+    found: boolean;
+    user?: {
+      id: number;
+      email: string;
+      phone_number: string;
+      first_name: string;
+      last_name: string;
+      accounts: {
+        id: number;
+        account_type: string;
+      }[];
+    };
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params.email) queryParams.append("email", params.email);
+    if (params.phone) queryParams.append("phone", params.phone);
+
+    return this.request<{
+      found: boolean;
+      user?: {
+        id: number;
+        email: string;
+        phone_number: string;
+        first_name: string;
+        last_name: string;
+        accounts: {
+          id: number;
+          account_type: string;
+        }[];
+      };
+    }>(`/api/transfers/lookup?${queryParams.toString()}`);
+  }
+
+  // BillPay API methods
+  async getBillPayees(params?: {
+    business_name?: string;
+  }): Promise<{
+    payees: {
+      id: number;
+      business_name: string;
+      email: string;
+      phone: string;
+      street_address: string;
+      address_line_2: string | null;
+      city: string;
+      state_or_territory: string;
+      postal_code: string;
+      country: string;
+      account_number: string;
+      routing_number: string;
+      is_active: boolean;
+    }[];
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params?.business_name) {
+      queryParams.append("business_name", params.business_name);
+    }
+
+    const queryString = queryParams.toString();
+    return this.request<{
+      payees: {
+        id: number;
+        business_name: string;
+        email: string;
+        phone: string;
+        street_address: string;
+        address_line_2: string | null;
+        city: string;
+        state_or_territory: string;
+        postal_code: string;
+        country: string;
+        account_number: string;
+        routing_number: string;
+        is_active: boolean;
+      }[];
+    }>(`/api/billpay/payees${queryString ? `?${queryString}` : ""}`);
+  }
+
+  async createBillPayee(data: {
+    business_name: string;
+    email: string;
+    phone: string;
+    street_address: string;
+    address_line_2?: string;
+    city: string;
+    state_or_territory: string;
+    postal_code: string;
+    country?: string;
+    account_number: string;
+    routing_number: string;
+  }): Promise<{
+    payee: {
+      id: number;
+      business_name: string;
+      email: string;
+      phone: string;
+      street_address: string;
+      address_line_2: string | null;
+      city: string;
+      state_or_territory: string;
+      postal_code: string;
+      country: string;
+      account_number: string;
+      routing_number: string;
+      is_active: boolean;
+    };
+  }> {
+    return this.request<{
+      payee: {
+        id: number;
+        business_name: string;
+        email: string;
+        phone: string;
+        street_address: string;
+        address_line_2: string | null;
+        city: string;
+        state_or_territory: string;
+        postal_code: string;
+        country: string;
+        account_number: string;
+        routing_number: string;
+        is_active: boolean;
+      };
+    }>("/api/billpay/payees", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getBillPayRules(): Promise<{
+    rules: {
+      id: number;
+      user_id: number;
+      source_internal_id: number;
+      payee_id: number;
+      amount: number;
+      frequency: string;
+      start_time: string;
+      end_time: string | null;
+    }[];
+  }> {
+    return this.request<{
+      rules: {
+        id: number;
+        user_id: number;
+        source_internal_id: number;
+        payee_id: number;
+        amount: number;
+        frequency: string;
+        start_time: string;
+        end_time: string | null;
+      }[];
+    }>("/api/billpay/rules");
+  }
+
+  async createBillPayRule(data: {
+    source_account_id: number;
+    payee_id?: number;
+    payee?: {
+      business_name: string;
+      email: string;
+      phone: string;
+      street_address: string;
+      address_line_2?: string;
+      city: string;
+      state_or_territory: string;
+      postal_code: string;
+      country?: string;
+      account_number: string;
+      routing_number: string;
+    };
+    amount: string; // Amount as string
+    frequency: string; // Cron expression
+    start_time: string; // ISO datetime string
+    end_time?: string; // ISO datetime string
+  }): Promise<{
+    rule: {
+      id: number;
+      user_id: number;
+      source_internal_id: number;
+      payee_id: number;
+      amount: number;
+      frequency: string;
+      start_time: string;
+      end_time: string | null;
+    };
+  }> {
+    return this.request<{
+      rule: {
+        id: number;
+        user_id: number;
+        source_internal_id: number;
+        payee_id: number;
+        amount: number;
+        frequency: string;
+        start_time: string;
+        end_time: string | null;
+      };
+    }>("/api/billpay/rules", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Check deposit API methods
+  async uploadCheckImage(file: {
+    uri: string;
+    type: string;
+    name: string;
+  }): Promise<{
+    image_url: string;
+    upload_id: string;
+  }> {
+    const token = await this.getAuthToken();
+    if (!token) {
+      throw new Error("Not authenticated");
+    }
+
+    const formData = new FormData();
+    // React Native FormData accepts file objects with uri property
+    formData.append("file", {
+      uri: file.uri,
+      type: file.type,
+      name: file.name,
+    } as any);
+
+    const response = await fetch(`${API_URL}/api/checks/upload`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // Don't set Content-Type - let fetch set it with boundary
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error: ApiError = await response.json().catch(() => ({
+        message: `HTTP error! status: ${response.status}`,
+      }));
+      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async depositCheck(data: {
+    check_image_url: string;
+    destination_account_number: string;
+  }): Promise<{
+    status: string;
+    transaction_id?: number;
+    amount?: number;
+    validation_result?: {
+      extracted_amount: number;
+      routing_number?: string;
+      account_number?: string;
+      check_number?: string;
+      payee_name?: string;
+      payor_name?: string;
+    };
+    error?: string;
+    message?: string;
+  }> {
+    return this.request<{
+      status: string;
+      transaction_id?: number;
+      amount?: number;
+      validation_result?: {
+        extracted_amount: number;
+        routing_number?: string;
+        account_number?: string;
+        check_number?: string;
+        payee_name?: string;
+        payor_name?: string;
+      };
+      error?: string;
+      message?: string;
+    }>("/api/checks/deposit", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Transfer history API methods
+  async getTransferHistory(params?: {
+    page?: number;
+    limit?: number;
+    type?: "internal_transfer" | "external_transfer" | "deposit";
+    start_date?: string;
+    end_date?: string;
+  }): Promise<{
+    transfers: {
+      id: number;
+      created_at: string;
+      amount: number;
+      status: "approved" | "denied";
+      transaction_type: "internal_transfer" | "external_transfer" | "deposit";
+      direction: "inbound" | "outbound";
+      source_account_number?: string;
+      destination_account_number?: string;
+      external_routing_number?: string;
+      external_account_number?: string;
+      external_nickname?: string;
+      check_image_url?: string;
+      check_number?: string;
+    }[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      total_pages: number;
+    };
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+    if (params?.type) queryParams.append("type", params.type);
+    if (params?.start_date) queryParams.append("start_date", params.start_date);
+    if (params?.end_date) queryParams.append("end_date", params.end_date);
+
+    const queryString = queryParams.toString();
+    const url = `/api/transfers/history${queryString ? `?${queryString}` : ""}`;
+
+    return this.request<{
+      transfers: {
+        id: number;
+        created_at: string;
+        amount: number;
+        status: "approved" | "denied";
+        transaction_type: "internal_transfer" | "external_transfer";
+        direction: "inbound" | "outbound";
+        source_account_number?: string;
+        destination_account_number?: string;
+        external_routing_number?: string;
+        external_account_number?: string;
+        external_nickname?: string;
+      }[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        total_pages: number;
+      };
+    }>(url, {
+      method: "GET",
     });
   }
 }

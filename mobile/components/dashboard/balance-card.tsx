@@ -30,7 +30,12 @@ export function BalanceCard({ balance }: BalanceCardProps) {
       ]}
     >
       <ThemedText style={styles.label}>Total Balance</ThemedText>
-      <ThemedText style={[styles.balance, { color: colors.success }]}>
+      <ThemedText
+        style={[styles.balance, { color: colors.success }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit={true}
+        minimumFontScale={0.5}
+      >
         {formatCurrency(balance)}
       </ThemedText>
     </ThemedView>

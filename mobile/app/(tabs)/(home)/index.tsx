@@ -144,7 +144,7 @@ export default function DashboardScreen() {
           ) : (
             <View style={styles.accountsList}>
               {accounts.map((account, index) => (
-                <View key={account.id} style={index > 0 && { marginTop: 12 }}>
+                <View key={account.id} style={index > 0 && { marginTop: 6 }}>
                   <AccountCard account={account} />
                 </View>
               ))}
@@ -251,13 +251,14 @@ const styles = StyleSheet.create({
     lineHeight: 32,
   },
   section: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
-    marginBottom: 8,
+    marginBottom: 6,
+    fontSize: 16,
   },
   accountsList: {
-    marginTop: 8,
+    marginTop: 4,
   },
   recentActivityContainer: {
     flex: 1,

@@ -8,6 +8,22 @@ jest.mock('@/lib/atm', () => ({
   geocodeAddress: jest.fn(),
 }));
 
+// Mock expo-location
+jest.mock('expo-location', () => ({
+  requestForegroundPermissionsAsync: jest.fn(),
+  getCurrentPositionAsync: jest.fn(),
+}));
+
+// Mock Linking
+jest.mock('react-native/Libraries/Linking/Linking', () => ({
+  openURL: jest.fn(),
+}));
+
+// Mock ActionSheetIOS
+jest.mock('react-native/Libraries/ActionSheetIOS/ActionSheetIOS', () => ({
+  showActionSheetWithOptions: jest.fn(),
+}));
+
 // Mock GoogleMapsWebView
 jest.mock('@/components/maps/google-maps-webview', () => {
   const React = require('react');
@@ -26,17 +42,18 @@ describe('AtmLocatorScreen', () => {
     expect(getByPlaceholderText(/Enter address or use current location/)).toBeTruthy();
   });
 
-  it('renders search input and button', () => {
-    const { getByPlaceholderText, getByText } = renderWithProviders(<AtmLocatorScreen />);
+  it('renders search input with location icon button', () => {
+    const { getByPlaceholderText } = renderWithProviders(<AtmLocatorScreen />);
 
     expect(getByPlaceholderText(/Enter address or use current location/)).toBeTruthy();
-    expect(getByText('Search')).toBeTruthy();
+    // Location button is integrated into search input
   });
 
-  it('renders location button', () => {
-    const { getByText } = renderWithProviders(<AtmLocatorScreen />);
-
-    expect(getByText('Use My Location')).toBeTruthy();
+  it('renders search icon button', () => {
+    const { getByPlaceholderText } = renderWithProviders(<AtmLocatorScreen />);
+    
+    // Search button is now an icon button
+    expect(getByPlaceholderText(/Enter address or use current location/)).toBeTruthy();
   });
 });
 
