@@ -5,9 +5,12 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { useForm } from "@tanstack/react-form";
 import { useFocusEffect } from "@react-navigation/native";
+import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -59,14 +62,20 @@ interface BillPayFormData {
   end_time?: string;
 }
 
-export function BillPayForm() {
+interface BillPayFormProps {
+  ruleId?: number;
+}
+
+export function BillPayForm({ ruleId }: BillPayFormProps = {}) {
   const { theme } = useTheme();
   const colors = Colors[theme];
+  const insets = useSafeAreaInsets();
   const { data: accountsData, isLoading: accountsLoading } = useAccounts();
   const [formState, setFormState] = useState<FormState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [payees, setPayees] = useState<any[]>([]);
   const [frequencyPreset, setFrequencyPreset] = useState("0 9 * * *");
+  const [isLoadingRule, setIsLoadingRule] = useState(false);
   const [successData, setSuccessData] = useState<{
     rule_id: number;
     amount: number;
@@ -74,6 +83,7 @@ export function BillPayForm() {
   } | null>(null);
 
   const accounts = accountsData?.accounts || [];
+  const isEditMode = !!ruleId;
 
   const fetchPayees = useCallback(async () => {
     try {
@@ -91,7 +101,7 @@ export function BillPayForm() {
       payee: undefined,
       amount: "",
       frequency: "0 9 * * *",
-      start_time: new Date().toISOString(),
+      start_time: "", // Will be set on submit to ensure it's in the future
       end_time: "",
     } as BillPayFormData,
     onSubmit: async ({ value }) => {
@@ -99,18 +109,87 @@ export function BillPayForm() {
       setError(null);
 
       try {
+        // Validate required fields before submission
+        if (!value.source_account_id) {
+          throw new Error("Source account is required");
+        }
+        if (!value.payee_id && !value.payee) {
+          throw new Error("Payee is required");
+        }
+        if (!value.amount || value.amount.trim() === "") {
+          throw new Error("Amount is required");
+        }
+
         const frequency =
           frequencyPreset === "custom" ? value.frequency : frequencyPreset;
 
-        const result = await api.createBillPayRule({
-          source_account_id: value.source_account_id!,
-          payee_id: value.payee_id,
-          payee: value.payee,
-          amount: value.amount,
-          frequency,
-          start_time: value.start_time,
-          end_time: value.end_time,
-        });
+        if (!frequency || frequency.trim() === "") {
+          throw new Error("Frequency is required");
+        }
+
+        let result;
+        if (isEditMode && ruleId) {
+          // Update existing rule
+          const updateData: {
+            source_account_id?: number;
+            payee_id?: number;
+            amount?: string;
+            frequency?: string;
+            start_time?: string;
+            end_time?: string | null;
+          } = {};
+
+          // Only include fields that have changed
+          if (value.source_account_id) {
+            updateData.source_account_id = value.source_account_id;
+          }
+          if (value.payee_id) {
+            updateData.payee_id = value.payee_id;
+          }
+          if (value.amount) {
+            updateData.amount = value.amount;
+          }
+          if (frequency) {
+            updateData.frequency = frequency;
+          }
+          if (value.start_time) {
+            updateData.start_time = value.start_time;
+          }
+          if (value.end_time !== undefined) {
+            updateData.end_time = value.end_time || null;
+          }
+
+          result = await api.updateBillPayRule(ruleId, updateData);
+        } else {
+          // Create new rule
+          // Ensure start_time is in the future (at least 1 hour from now)
+          const futureStartTime = new Date();
+          futureStartTime.setHours(futureStartTime.getHours() + 1);
+          const startTimeToUse = value.start_time || futureStartTime.toISOString();
+
+          // Ensure amount is properly formatted (ensure it has decimal places)
+          let formattedAmount = value.amount;
+          if (formattedAmount && !formattedAmount.includes(".")) {
+            formattedAmount = `${formattedAmount}.00`;
+          } else if (formattedAmount && formattedAmount.includes(".")) {
+            const parts = formattedAmount.split(".");
+            if (parts[1].length === 1) {
+              formattedAmount = `${parts[0]}.${parts[1]}0`;
+            } else if (parts[1].length === 0) {
+              formattedAmount = `${parts[0]}.00`;
+            }
+          }
+
+          result = await api.createBillPayRule({
+            source_account_id: value.source_account_id!,
+            payee_id: value.payee_id,
+            payee: value.payee,
+            amount: formattedAmount,
+            frequency,
+            start_time: startTimeToUse,
+            end_time: value.end_time && value.end_time.trim() !== "" ? value.end_time : undefined,
+          });
+        }
 
         const payeeName =
           payees.find((p) => p.id === result.rule.payee_id)?.business_name ||
@@ -127,11 +206,26 @@ export function BillPayForm() {
         Toast.show({
           type: "success",
           text1: "Success",
-          text2: "Bill pay rule created successfully",
+          text2: isEditMode
+            ? "Bill pay rule updated successfully"
+            : "Bill pay rule created successfully",
         });
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to create bill pay rule";
+        let errorMessage = isEditMode
+          ? "Failed to update bill pay rule"
+          : "Failed to create bill pay rule";
+        if (err instanceof Error) {
+          errorMessage = err.message;
+          // If the error includes validation details, use those
+          if (errorMessage.includes("Invalid request body") || errorMessage.includes(":")) {
+            // Already formatted with details
+          } else {
+            // Try to extract more details from the error if it's an API error
+            console.error("Bill pay error:", err);
+          }
+        } else if (typeof err === "object" && err !== null && "message" in err) {
+          errorMessage = String(err.message);
+        }
         setError(errorMessage);
         setFormState("error");
         Toast.show({
@@ -143,12 +237,53 @@ export function BillPayForm() {
     },
   });
 
+  // Fetch rule data when in edit mode
   useEffect(() => {
-    fetchPayees();
-    if (accounts.length > 0 && formState === "idle") {
+    if (isEditMode && ruleId) {
+      const fetchRule = async () => {
+        setIsLoadingRule(true);
+        try {
+          const result = await api.getBillPayRules();
+          const rule = result.rules.find((r) => r.id === ruleId);
+
+          if (rule) {
+            // Pre-populate form with existing rule data
+            form.setFieldValue("source_account_id", rule.source_internal_id);
+            form.setFieldValue("payee_id", rule.payee_id);
+            form.setFieldValue(
+              "amount",
+              (rule.amount / 100).toFixed(2), // Convert from cents to dollars
+            );
+            form.setFieldValue("frequency", rule.frequency);
+            form.setFieldValue("start_time", rule.start_time);
+            form.setFieldValue("end_time", rule.end_time || "");
+
+            // Set frequency preset if it matches
+            const preset = FREQUENCY_PRESETS.find((p) => p.value === rule.frequency);
+            if (preset) {
+              setFrequencyPreset(preset.value);
+            } else {
+              setFrequencyPreset("custom");
+            }
+
+            setFormState("filling");
+          }
+        } catch (err) {
+          console.error("Failed to fetch rule:", err);
+          setError("Failed to load rule data");
+        } finally {
+          setIsLoadingRule(false);
+        }
+      };
+      fetchRule();
+    } else if (!isEditMode && accounts.length > 0 && formState === "idle") {
       setFormState("filling");
     }
-  }, [accounts.length, formState, fetchPayees]);
+  }, [isEditMode, ruleId, accounts.length, formState, form]);
+
+  useEffect(() => {
+    fetchPayees();
+  }, [fetchPayees]);
 
   // Refresh payees when screen comes into focus (e.g., after creating a payee)
   useFocusEffect(
@@ -192,86 +327,147 @@ export function BillPayForm() {
     }).format(amount);
   };
 
-  if (accountsLoading || accounts.length === 0) {
+  if (accountsLoading || isLoadingRule || accounts.length === 0) {
     return (
       <ThemedView style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
-        <ThemedText style={styles.loadingText}>Loading accounts...</ThemedText>
+        <ThemedText style={styles.loadingText}>
+          {isLoadingRule ? "Loading rule..." : "Loading accounts..."}
+        </ThemedText>
       </ThemedView>
     );
   }
 
   if (formState === "success" && successData) {
     return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-      >
-        <ThemedView
-          style={[
-            styles.successCard,
-            {
-              backgroundColor: colors.success + "20",
-              borderColor: colors.success,
-            },
-          ]}
+      <>
+        {/* Render the form in the background */}
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.content}
         >
-          <IconSymbol
-            name="checkmark.circle.fill"
-            size={64}
-            color={colors.success}
-          />
-          <ThemedText type="title" style={styles.successTitle}>
-            Bill Pay Rule Created!
-          </ThemedText>
-          <ThemedText style={styles.successAmount}>
-            {formatCurrency(successData.amount / 100)}
-          </ThemedText>
-          <View style={styles.successDetails}>
-            <ThemedText
-              style={[
-                styles.successDetail,
-                {
-                  color: colors.mutedForeground,
-                },
-              ]}
-            >
-              Payee: {successData.payee_name}
-            </ThemedText>
-            <ThemedText
-              style={[
-                styles.successDetail,
-                {
-                  color: colors.mutedForeground,
-                  fontSize: 12,
-                },
-              ]}
-            >
-              Rule ID: {successData.rule_id}
-            </ThemedText>
-          </View>
-          <TouchableOpacity
+        </ScrollView>
+
+        {/* Full-screen success modal */}
+        <Modal
+          visible={formState === "success"}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={handleReset}
+        >
+          <ThemedView
             style={[
-              styles.button,
+              styles.successModalContainer,
               {
-                backgroundColor: colors.accent,
+                paddingTop: insets.top,
+                paddingBottom: insets.bottom,
               },
             ]}
-            onPress={handleReset}
           >
-            <ThemedText
-              style={[
-                styles.buttonText,
-                {
-                  color: colors.accentForeground,
-                },
-              ]}
+            <ScrollView
+              contentContainerStyle={styles.successContent}
+              showsVerticalScrollIndicator={false}
             >
-              Create Another Rule
-            </ThemedText>
-          </TouchableOpacity>
-        </ThemedView>
-      </ScrollView>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={handleReset}
+              >
+                <IconSymbol name="xmark" size={24} color={colors.text} />
+              </TouchableOpacity>
+
+              <View style={styles.successContentInner}>
+                <IconSymbol
+                  name="checkmark.circle.fill"
+                  size={80}
+                  color={colors.success}
+                />
+                <View style={styles.successTitleContainer}>
+                  <ThemedText type="title" style={styles.successTitle}>
+                    {isEditMode
+                      ? "Bill Pay Rule Updated!"
+                      : "Bill Pay Rule Created!"}
+                  </ThemedText>
+                </View>
+                <View style={styles.successAmountContainer}>
+                  <ThemedText style={styles.successAmount}>
+                    {formatCurrency(successData.amount / 100)}
+                  </ThemedText>
+                </View>
+                <View style={styles.successDetails}>
+                  <ThemedText
+                    style={[
+                      styles.successDetail,
+                      {
+                        color: colors.mutedForeground,
+                      },
+                    ]}
+                  >
+                    Payee: {successData.payee_name}
+                  </ThemedText>
+                  <ThemedText
+                    style={[
+                      styles.successDetail,
+                      {
+                        color: colors.mutedForeground,
+                        fontSize: 12,
+                      },
+                    ]}
+                  >
+                    Rule ID: {successData.rule_id}
+                  </ThemedText>
+                </View>
+                <View style={styles.successButtons}>
+                  <TouchableOpacity
+                    style={[
+                      styles.button,
+                      styles.secondaryButton,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      handleReset();
+                      router.push("/(tabs)/transfers/billpay-rules");
+                    }}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.buttonText,
+                        {
+                          color: colors.text,
+                        },
+                      ]}
+                    >
+                      View Rules
+                    </ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.button,
+                      {
+                        backgroundColor: colors.accent,
+                      },
+                    ]}
+                    onPress={handleReset}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.buttonText,
+                        {
+                          color: colors.accentForeground,
+                        },
+                      ]}
+                    >
+                      {isEditMode ? "Done" : "Create Another Rule"}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </ThemedView>
+        </Modal>
+      </>
     );
   }
 
@@ -311,7 +507,7 @@ export function BillPayForm() {
 
     return (
       <TransferReviewScreen
-        title="Review Bill Pay Rule"
+        title={isEditMode ? "Review Bill Pay Rule Update" : "Review Bill Pay Rule"}
         details={details}
         onConfirm={() => form.handleSubmit()}
         onBack={handleBack}
@@ -376,7 +572,21 @@ export function BillPayForm() {
         )}
       </form.Field>
 
-      <form.Field name="amount">
+      <form.Field
+        name="amount"
+        validators={{
+          onChange: ({ value }) => {
+            if (!value || value.trim() === "") return "Amount is required";
+            const numValue = parseFloat(value);
+            if (isNaN(numValue) || numValue <= 0)
+              return "Amount must be greater than $0.00";
+            if (numValue < 0.01) return "Amount must be at least $0.01";
+            if (numValue > 9999999.99)
+              return "Amount cannot exceed $9,999,999.99";
+            return undefined;
+          },
+        }}
+      >
         {(field) => (
           <View style={styles.field}>
             <ThemedText style={styles.label}>Amount</ThemedText>
@@ -540,20 +750,54 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
   },
-  successCard: {
-    borderRadius: 12,
-    borderWidth: 1,
+  successModalContainer: {
+    flex: 1,
+  },
+  successContent: {
+    flexGrow: 1,
+    justifyContent: "center",
     padding: 24,
+  },
+  successContentInner: {
     alignItems: "center",
+    width: "100%",
+    flex: 1,
+    justifyContent: "center",
+  },
+  successTitleContainer: {
+    width: "100%",
+    alignItems: "center",
+    marginTop: 24,
+    marginBottom: 0,
+    paddingBottom: 0,
+    minHeight: 60,
+  },
+  successAmountContainer: {
+    width: "100%",
+    alignItems: "center",
+    marginTop: 32,
+    marginBottom: 24,
+    paddingTop: 0,
+    minHeight: 50,
+  },
+  closeButton: {
+    alignSelf: "flex-end",
+    padding: 8,
+    marginBottom: 16,
   },
   successTitle: {
-    marginTop: 16,
-    marginBottom: 8,
+    textAlign: "center",
+    includeFontPadding: false,
+    textAlignVertical: "center",
+    lineHeight: 42,
   },
   successAmount: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: "bold",
-    marginBottom: 16,
+    textAlign: "center",
+    includeFontPadding: false,
+    textAlignVertical: "center",
+    lineHeight: 48,
   },
   successDetails: {
     width: "100%",
@@ -563,6 +807,20 @@ const styles = StyleSheet.create({
   successDetail: {
     fontSize: 14,
     textAlign: "center",
+  },
+  successButtons: {
+    width: "100%",
+    gap: 12,
+    marginTop: 8,
+  },
+  secondaryButton: {
+    borderWidth: 1,
+  },
+  successCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: "center",
   },
 });
 

@@ -103,11 +103,29 @@ class ApiClient {
         }
       }
 
-      const error: ApiError & { error?: string; message?: string } = await response.json().catch(() => ({
+      const error: ApiError & { error?: string; message?: string; details?: unknown } = await response.json().catch(() => ({
         message: `HTTP error! status: ${response.status}`,
       }));
+      
       // Prefer message field, fall back to error field, then ApiError.message
-      const errorMessage = error.message || error.error || `HTTP error! status: ${response.status}`;
+      let errorMessage = error.message || error.error || `HTTP error! status: ${response.status}`;
+      
+      // If there are validation details, try to extract more specific error messages
+      if (error.details && Array.isArray(error.details)) {
+        const detailMessages = error.details
+          .map((detail: { path?: string[]; message?: string }) => {
+            if (detail.path && detail.message) {
+              const fieldName = detail.path[detail.path.length - 1];
+              return `${fieldName}: ${detail.message}`;
+            }
+            return detail.message || String(detail);
+          })
+          .filter(Boolean);
+        if (detailMessages.length > 0) {
+          errorMessage = detailMessages.join(", ");
+        }
+      }
+      
       throw new Error(errorMessage);
     }
 
@@ -438,6 +456,51 @@ class ApiClient {
     }>("/api/billpay/rules", {
       method: "POST",
       body: JSON.stringify(data),
+    });
+  }
+
+  async updateBillPayRule(
+    ruleId: number,
+    data: {
+      source_account_id?: number;
+      payee_id?: number;
+      amount?: string; // Amount as string
+      frequency?: string; // Cron expression
+      start_time?: string; // ISO datetime string
+      end_time?: string | null; // ISO datetime string or null
+    },
+  ): Promise<{
+    rule: {
+      id: number;
+      user_id: number;
+      source_internal_id: number;
+      payee_id: number;
+      amount: number;
+      frequency: string;
+      start_time: string;
+      end_time: string | null;
+    };
+  }> {
+    return this.request<{
+      rule: {
+        id: number;
+        user_id: number;
+        source_internal_id: number;
+        payee_id: number;
+        amount: number;
+        frequency: string;
+        start_time: string;
+        end_time: string | null;
+      };
+    }>(`/api/billpay/rules/${ruleId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBillPayRule(ruleId: number): Promise<void> {
+    return this.request<void>(`/api/billpay/rules/${ruleId}`, {
+      method: "DELETE",
     });
   }
 

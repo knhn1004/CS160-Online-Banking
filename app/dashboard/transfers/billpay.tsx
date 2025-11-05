@@ -14,8 +14,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle, ArrowRight, Calendar, Trash2 } from "lucide-react";
+import {
+  CheckCircle,
+  ArrowRight,
+  Calendar,
+  Trash2,
+  Pencil,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { BillPayPayeeSchema } from "@/lib/schemas/billpay";
 import { InternalAccountResponse } from "@/lib/schemas/transfer";
 import { formatCurrency } from "@/lib/utils";
@@ -90,6 +103,7 @@ export function BillPay() {
   const [payeeSearchTerm, setPayeeSearchTerm] = useState("");
   const [showPayeeForm, setShowPayeeForm] = useState(false);
   const [selectedPayeeId, setSelectedPayeeId] = useState<number | null>(null);
+  const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
   const [frequencyPreset, setFrequencyPreset] = useState<string>("0 9 * * *");
   const [customFrequency, setCustomFrequency] = useState<string>("");
   const [successData, setSuccessData] = useState<{
@@ -294,14 +308,132 @@ export function BillPay() {
     }
   };
 
-  const handleDeleteRule = async (ruleId: number) => {
+  const handleEditRule = (ruleId: number) => {
+    const rule = rules.find((r) => r.id === ruleId);
+    if (!rule) return;
+
+    setEditingRuleId(ruleId);
+    // Pre-populate form with existing rule data
+    form.setFieldValue("source_account_id", rule.source_internal_id);
+    form.setFieldValue("payee_id", rule.payee_id);
+    form.setFieldValue("amount", rule.amount.toString());
+
+    // Set frequency preset if it matches
+    const preset = FREQUENCY_PRESETS.find((p) => p.value === rule.frequency);
+    if (preset) {
+      setFrequencyPreset(preset.value);
+    } else {
+      setFrequencyPreset("custom");
+      setCustomFrequency(rule.frequency);
+    }
+
+    form.setFieldValue("frequency", rule.frequency);
+    form.setFieldValue("start_time", rule.start_time);
+    form.setFieldValue("end_time", rule.end_time || "");
+    setSelectedPayeeId(rule.payee_id);
+    setFormState("filling");
+  };
+
+  const handleUpdateRule = async () => {
+    if (!editingRuleId) return;
+
+    setFormState("submitting");
+    setError(null);
+
     try {
       const supabase = createClient();
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      if (!session) return;
+      if (!session) {
+        throw new Error("Not authenticated");
+      }
+
+      const value = form.state.values;
+      const frequency =
+        frequencyPreset === "custom" ? customFrequency : frequencyPreset;
+
+      const updateData: {
+        source_account_id?: number;
+        payee_id?: number;
+        amount?: string;
+        frequency?: string;
+        start_time?: string;
+        end_time?: string | null;
+      } = {};
+
+      // Only include fields that have changed
+      if (value.source_account_id) {
+        updateData.source_account_id = value.source_account_id;
+      }
+      if (value.payee_id) {
+        updateData.payee_id = value.payee_id;
+      }
+      if (value.amount) {
+        updateData.amount = value.amount;
+      }
+      if (frequency) {
+        updateData.frequency = frequency;
+      }
+      if (value.start_time) {
+        updateData.start_time = value.start_time;
+      }
+      if (value.end_time !== undefined) {
+        updateData.end_time = value.end_time || null;
+      }
+
+      const response = await fetch(`/api/billpay/rules/${editingRuleId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json()) as {
+          error: string;
+          details?: unknown;
+        };
+        throw new Error(data.error || "Failed to update billpay rule");
+      }
+
+      setEditingRuleId(null);
+      form.reset();
+      fetchRules(); // Refresh rules list
+      setFormState("idle");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update billpay rule",
+      );
+      setFormState("error");
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRuleId(null);
+    form.reset();
+    setFormState("idle");
+    setFrequencyPreset("0 9 * * *");
+    setCustomFrequency("");
+  };
+
+  const handleDeleteRule = async (ruleId: number) => {
+    if (!confirm("Are you sure you want to delete this bill pay rule?")) {
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error("Not authenticated");
+      }
 
       const response = await fetch(`/api/billpay/rules/${ruleId}`, {
         method: "DELETE",
@@ -310,11 +442,19 @@ export function BillPay() {
         },
       });
 
-      if (response.ok) {
-        fetchRules(); // Refresh rules list
+      if (!response.ok) {
+        const data = (await response.json()) as {
+          error: string;
+          details?: unknown;
+        };
+        throw new Error(data.error || "Failed to delete billpay rule");
       }
+
+      fetchRules(); // Refresh rules list
     } catch (err) {
-      console.error("Failed to delete rule:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to delete billpay rule",
+      );
     }
   };
 
@@ -449,6 +589,288 @@ export function BillPay() {
 
   return (
     <div className="space-y-6">
+      <Dialog
+        open={editingRuleId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCancelEdit();
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Bill Pay Rule</DialogTitle>
+            <DialogDescription>
+              Update your bill pay rule settings below.
+            </DialogDescription>
+          </DialogHeader>
+          {editingRuleId !== null && (
+            <Card>
+              <CardContent className="pt-6">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleUpdateRule();
+                  }}
+                  className="space-y-6"
+                >
+                  {/* Same form fields as create form */}
+                  <form.Field
+                    name="source_account_id"
+                    validators={{
+                      onChange: ({ value }) => {
+                        if (!value || value === 0)
+                          return "Source account is required";
+                        return undefined;
+                      },
+                    }}
+                  >
+                    {(field) => (
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="source_account_id"
+                          className="text-sm font-medium"
+                        >
+                          From Account
+                        </label>
+                        <Select
+                          value={
+                            field.state.value && field.state.value > 0
+                              ? field.state.value.toString()
+                              : ""
+                          }
+                          onValueChange={(value) =>
+                            field.handleChange(parseInt(value))
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select source account" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {accounts.map((account) => (
+                              <SelectItem
+                                key={account.id}
+                                value={account.id.toString()}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span>
+                                    ****{account.account_number.slice(-4)}
+                                  </span>
+                                  <div className="flex items-center gap-2 ml-4">
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
+                                      {account.account_type}
+                                    </Badge>
+                                    <span className="text-sm text-muted-foreground">
+                                      {formatCurrency(account.balance)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {field.state.meta.errors.length > 0 && (
+                          <p className="text-sm text-warning">
+                            {field.state.meta.errors[0]}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="payee_id">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="payee_id"
+                          className="text-sm font-medium"
+                        >
+                          Payee
+                        </label>
+                        <Select
+                          value={
+                            field.state.value
+                              ? field.state.value.toString()
+                              : ""
+                          }
+                          onValueChange={(value) =>
+                            field.handleChange(parseInt(value))
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select payee" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {payees.map((payee) => (
+                              <SelectItem
+                                key={payee.id}
+                                value={payee.id.toString()}
+                              >
+                                {payee.business_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="amount">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <label htmlFor="amount" className="text-sm font-medium">
+                          Amount
+                        </label>
+                        <CurrencyInputField
+                          id="amount"
+                          value={field.state.value || ""}
+                          onChange={(value) => field.handleChange(value)}
+                          placeholder="0.00"
+                        />
+                        {field.state.meta.errors.length > 0 && (
+                          <p className="text-sm text-warning">
+                            {field.state.meta.errors[0]}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </form.Field>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Frequency</label>
+                    <Select
+                      value={frequencyPreset}
+                      onValueChange={(value) => {
+                        setFrequencyPreset(value);
+                        if (value !== "custom") {
+                          form.setFieldValue("frequency", value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FREQUENCY_PRESETS.filter(
+                          (p) => p.value !== "custom",
+                        ).map((preset) => (
+                          <SelectItem key={preset.value} value={preset.value}>
+                            {preset.label}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">Custom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {frequencyPreset === "custom" && (
+                      <Input
+                        placeholder="e.g., 0 9 * * 1"
+                        value={customFrequency}
+                        onChange={(e) => {
+                          setCustomFrequency(e.target.value);
+                          form.setFieldValue("frequency", e.target.value);
+                        }}
+                        className="mt-2"
+                      />
+                    )}
+                  </div>
+
+                  <form.Field name="start_time">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="start_time"
+                          className="text-sm font-medium"
+                        >
+                          Start Time
+                        </label>
+                        <Input
+                          type="datetime-local"
+                          value={
+                            field.state.value
+                              ? new Date(field.state.value)
+                                  .toISOString()
+                                  .slice(0, 16)
+                              : ""
+                          }
+                          onChange={(e) =>
+                            field.handleChange(
+                              new Date(e.target.value).toISOString(),
+                            )
+                          }
+                        />
+                      </div>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="end_time">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="end_time"
+                          className="text-sm font-medium"
+                        >
+                          End Time (Optional)
+                        </label>
+                        <Input
+                          type="datetime-local"
+                          value={
+                            field.state.value
+                              ? new Date(field.state.value)
+                                  .toISOString()
+                                  .slice(0, 16)
+                              : ""
+                          }
+                          onChange={(e) =>
+                            field.handleChange(
+                              e.target.value
+                                ? new Date(e.target.value).toISOString()
+                                : "",
+                            )
+                          }
+                        />
+                      </div>
+                    )}
+                  </form.Field>
+
+                  {error && (
+                    <div
+                      className="rounded-md bg-destructive/20 border border-destructive/50 p-4 text-sm text-destructive"
+                      role="alert"
+                    >
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCancelEdit}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={formState === "submitting"}
+                      className="flex-1"
+                    >
+                      {formState === "submitting"
+                        ? "Updating..."
+                        : "Update Rule"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle>Set Up Auto Payment</CardTitle>
@@ -820,14 +1242,24 @@ export function BillPay() {
                           ` • Ends: ${formatDate(rule.end_time)}`}
                       </p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteRule(rule.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditRule(rule.id)}
+                        className="text-primary hover:text-primary"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteRule(rule.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
@@ -861,8 +1293,7 @@ function BillPayeeForm({
     routing_number: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     const result = BillPayPayeeSchema.safeParse(formData);
     if (result.success) {
       onSubmit(result.data);
@@ -872,7 +1303,7 @@ function BillPayeeForm({
   return (
     <div className="space-y-3 rounded-lg border bg-card p-4">
       <h3 className="font-medium">Create New Payee</h3>
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="space-y-3">
         <Input
           placeholder="Business Name"
           value={formData.business_name}
@@ -938,7 +1369,7 @@ function BillPayeeForm({
           />
         </div>
         <div className="flex gap-2">
-          <Button type="submit" className="flex-1">
+          <Button type="button" onClick={handleSubmit} className="flex-1">
             Create
           </Button>
           <Button
@@ -950,7 +1381,7 @@ function BillPayeeForm({
             Cancel
           </Button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

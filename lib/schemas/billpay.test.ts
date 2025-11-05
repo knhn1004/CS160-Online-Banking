@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   BillPayPayeeSchema,
   BillPayRuleCreateSchema,
+  BillPayRuleUpdateSchema,
 } from "@/lib/schemas/billpay";
 
 describe("Billpay Schemas", () => {
@@ -197,6 +198,117 @@ describe("Billpay Schemas", () => {
         const result = BillPayRuleCreateSchema.safeParse(validData);
         expect(result.success).toBe(true);
       });
+    });
+  });
+
+  describe("BillPayRuleUpdateSchema", () => {
+    it("should validate update with single field", () => {
+      const validData = {
+        amount: "150.00",
+      };
+
+      const result = BillPayRuleUpdateSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.amount).toBe(15000); // Should be converted to cents
+      }
+    });
+
+    it("should validate update with multiple fields", () => {
+      const validData = {
+        source_account_id: 2,
+        amount: "200.00",
+        frequency: "0 10 * * *",
+      };
+
+      const result = BillPayRuleUpdateSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.amount).toBe(20000);
+        expect(result.data.source_account_id).toBe(2);
+        expect(result.data.frequency).toBe("0 10 * * *");
+      }
+    });
+
+    it("should validate update with all fields", () => {
+      const validData = {
+        source_account_id: 3,
+        payee_id: 2,
+        amount: "75.50",
+        frequency: "0 9 * * 1",
+        start_time: "2025-12-15T09:00:00Z",
+        end_time: "2026-12-15T09:00:00Z",
+      };
+
+      const result = BillPayRuleUpdateSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.amount).toBe(7550);
+      }
+    });
+
+    it("should validate update with null end_time", () => {
+      const validData = {
+        end_time: null,
+      };
+
+      const result = BillPayRuleUpdateSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.end_time).toBe(null);
+      }
+    });
+
+    it("should reject empty update object", () => {
+      const invalidData = {};
+
+      const result = BillPayRuleUpdateSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject invalid amount format", () => {
+      const invalidData = {
+        amount: "invalid",
+      };
+
+      const result = BillPayRuleUpdateSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject invalid cron expression", () => {
+      const invalidData = {
+        frequency: "invalid cron",
+      };
+
+      const result = BillPayRuleUpdateSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject invalid start_time format", () => {
+      const invalidData = {
+        start_time: "2025-12-01", // Invalid: not ISO datetime
+      };
+
+      const result = BillPayRuleUpdateSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject invalid source_account_id", () => {
+      const invalidData = {
+        source_account_id: 0, // Invalid: must be positive
+      };
+
+      const result = BillPayRuleUpdateSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject invalid payee_id", () => {
+      const invalidData = {
+        payee_id: -1, // Invalid: must be positive
+      };
+
+      const result = BillPayRuleUpdateSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
     });
   });
 });
