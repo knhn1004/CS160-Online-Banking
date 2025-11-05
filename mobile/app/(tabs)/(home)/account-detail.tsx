@@ -5,7 +5,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from "react-native";
-import { useLocalSearchParams, Stack, useRouter } from "expo-router";
+import { useLocalSearchParams, Stack } from "expo-router";
 import { useState, useEffect, useCallback } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
@@ -20,7 +20,6 @@ import { TransactionItem } from "@/components/dashboard/transaction-item";
 
 export default function AccountDetailScreen() {
   const params = useLocalSearchParams();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const colors = Colors[theme];
@@ -89,7 +88,7 @@ export default function AccountDetailScreen() {
         text1: "Copied",
         text2: `${label} copied to clipboard`,
       });
-    } catch (err) {
+    } catch {
       Toast.show({
         type: "error",
         text1: "Error",
@@ -106,7 +105,6 @@ export default function AccountDetailScreen() {
             title: "Account Details",
             headerShown: true,
             headerBackTitle: "",
-            headerBackTitleVisible: false,
             headerTintColor: colors.text,
             headerBackVisible: true,
           }}
@@ -125,7 +123,6 @@ export default function AccountDetailScreen() {
             title: "Account Details",
             headerShown: true,
             headerBackTitle: "",
-            headerBackTitleVisible: false,
             headerTintColor: colors.text,
             headerBackVisible: true,
           }}
@@ -158,7 +155,6 @@ export default function AccountDetailScreen() {
           title: `${accountType} Account`,
           headerShown: true,
           headerBackTitle: "",
-          headerBackTitleVisible: false,
           headerTintColor: colors.text,
           headerBackVisible: true,
         }}

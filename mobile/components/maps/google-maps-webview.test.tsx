@@ -14,15 +14,17 @@ jest.mock('expo-constants', () => ({
 
 // Mock react-native-webview
 jest.mock('react-native-webview', () => {
-  const React = require('react');
-  const { View } = require('react-native');
+  const React = jest.requireActual('react');
+  const { View } = jest.requireActual('react-native');
+  const MockWebView = React.forwardRef(({ source, onMessage, ...props }: any, ref: any) => {
+    React.useImperativeHandle(ref, () => ({
+      injectJavaScript: jest.fn(),
+    }));
+    return <View testID="webview" {...props} />;
+  });
+  MockWebView.displayName = 'MockWebView';
   return {
-    WebView: React.forwardRef(({ source, onMessage, ...props }: any, ref: any) => {
-      React.useImperativeHandle(ref, () => ({
-        injectJavaScript: jest.fn(),
-      }));
-      return <View testID="webview" {...props} />;
-    }),
+    WebView: MockWebView,
   };
 });
 

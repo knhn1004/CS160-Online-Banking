@@ -38,23 +38,33 @@ export default function AtmLocatorScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const cardPositions = useRef<{ [key: string]: number }>({});
 
-  // Request user's current location on mount
-  useEffect(() => {
-    requestLocation();
-  }, []);
+  const searchATMs = useCallback(async (lat: number, lng: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const results = await searchNearbyATMs(lat, lng);
+      setAtms(results);
 
-  // Scroll to selected ATM card when it changes
-  useEffect(() => {
-    if (selectedAtm && scrollViewRef.current) {
-      const cardY = cardPositions.current[selectedAtm.place_id];
-      if (cardY !== undefined) {
-        scrollViewRef.current.scrollTo({
-          y: cardY - 20, // Add some padding
-          animated: true,
+      if (results.length === 0) {
+        Toast.show({
+          type: "info",
+          text1: "No ATMs Found",
+          text2: "No Chase ATMs found in this area",
         });
       }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to search for ATMs";
+      setError(errorMessage);
+      Toast.show({
+        type: "error",
+        text1: "Search Error",
+        text2: errorMessage,
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [selectedAtm]);
+  }, []);
 
   const requestLocation = useCallback(async () => {
     try {
@@ -91,37 +101,14 @@ export default function AtmLocatorScreen() {
       });
       setLoading(false);
     }
-  }, []);
+  }, [searchATMs]);
 
-  const searchATMs = async (lat: number, lng: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const results = await searchNearbyATMs(lat, lng);
-      setAtms(results);
+  // Request user's current location on mount
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
 
-      if (results.length === 0) {
-        Toast.show({
-          type: "info",
-          text1: "No ATMs Found",
-          text2: "No Chase ATMs found in this area",
-        });
-      }
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to search for ATMs";
-      setError(errorMessage);
-      Toast.show({
-        type: "error",
-        text1: "Search Error",
-        text2: errorMessage,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddressSearch = async () => {
+  const handleAddressSearch = useCallback(async () => {
     if (!searchAddress.trim()) {
       Toast.show({
         type: "error",
@@ -149,7 +136,7 @@ export default function AtmLocatorScreen() {
       });
       setLoading(false);
     }
-  };
+  }, [searchATMs, searchAddress]);
 
   const formatDistance = (distance?: number) => {
     if (!distance) return "Unknown distance";
@@ -160,7 +147,6 @@ export default function AtmLocatorScreen() {
   const openInMaps = (atm: AtmLocation) => {
     const { lat, lng } = atm.geometry.location;
     const name = encodeURIComponent(atm.name);
-    const address = encodeURIComponent(atm.vicinity);
 
     const appleMapsUrl = `http://maps.apple.com/?q=${name}&ll=${lat},${lng}`;
     const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;

@@ -1,4 +1,5 @@
 import React from 'react';
+import { View } from 'react-native';
 import AtmLocatorScreen from '@/app/(tabs)/atm';
 import { renderWithProviders } from '@/test-utils';
 
@@ -10,10 +11,10 @@ jest.mock('@/lib/atm', () => ({
 
 // Mock GoogleMapsWebView
 jest.mock('@/components/maps/google-maps-webview', () => {
-  const React = require('react');
-  const { View } = require('react-native');
+  const MockGoogleMapsWebView = () => <View testID="google-maps-webview" />;
+  MockGoogleMapsWebView.displayName = 'MockGoogleMapsWebView';
   return {
-    GoogleMapsWebView: () => <View testID="google-maps-webview" />,
+    GoogleMapsWebView: MockGoogleMapsWebView,
   };
 });
 

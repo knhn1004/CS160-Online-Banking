@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, Text } from "react-native";
 import { WebView } from "react-native-webview";
 import Constants from "expo-constants";
@@ -27,7 +27,7 @@ export function GoogleMapsWebView({
     "";
 
   // Custom map styles based on theme
-  const getMapStyles = () => {
+  const getMapStyles = useCallback(() => {
     if (theme === "dark") {
       return [
         { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
@@ -184,7 +184,7 @@ export function GoogleMapsWebView({
         },
       ];
     }
-  };
+  }, [theme]);
 
   // Effect to update map when location or ATMs change
   useEffect(() => {
@@ -234,19 +234,12 @@ export function GoogleMapsWebView({
 
       webViewRef.current.injectJavaScript(script);
     }
-  }, [userLocation, atms, theme]);
+  }, [userLocation, atms, theme, getMapStyles]);
 
   // Effect to focus map on selected ATM
   useEffect(() => {
     if (webViewRef.current && selectedAtm) {
       const { lat, lng } = selectedAtm.geometry.location;
-      const atmName = selectedAtm.name.replace(/"/g, '&quot;').replace(/'/g, "&#39;");
-      const distance = selectedAtm.distance
-        ? selectedAtm.distance.toFixed(1)
-        : "";
-      const bgColor = theme === "dark" ? "#334155" : "#ffffff";
-      const textColor = theme === "dark" ? "#ffffff" : "#1e293b";
-      const secondaryColor = theme === "dark" ? "#94a3b8" : "#64748b";
       
       const script = `
         if (window.map) {
