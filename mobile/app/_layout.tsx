@@ -1,19 +1,24 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import 'react-native-reanimated';
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider as NavigationThemeProvider,
+} from "@react-navigation/native";
+import { Stack, useRouter, useSegments } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { AuthProvider, useAuth } from '@/contexts/auth-context';
+import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { ThemeProvider, useTheme } from "@/contexts/theme-context";
+import { Colors } from "@/constants/theme";
+import { ToastProvider } from "@/components/ui/alert-dialog";
 
 export const unstable_settings = {
-  initialRouteName: '(auth)',
+  initialRouteName: "(auth)",
 };
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  const { theme } = useTheme();
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -21,40 +26,64 @@ function RootLayoutNav() {
   useEffect(() => {
     if (loading) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const inTabsGroup = segments[0] === '(tabs)';
+    const inAuthGroup = segments[0] === "(auth)";
+    const inTabsGroup = segments[0] === "(tabs)";
 
     if (!user && !inAuthGroup) {
       // Redirect to login if not authenticated
-      router.replace('/(auth)/login');
+      router.replace("/(auth)/login");
     } else if (user && !inTabsGroup) {
       // Redirect to tabs if authenticated
-      router.replace('/(tabs)');
+      router.replace("/(tabs)/(home)");
     }
-  }, [user, loading, segments]);
+  }, [user, loading, segments, router]);
 
   if (loading) {
     return null; // Or a loading screen
   }
 
+  const navigationTheme = theme === "dark" ? DarkTheme : DefaultTheme;
+  const colors = Colors[theme];
+
+  // Customize navigation theme to match app colors
+  const customTheme = {
+    ...navigationTheme,
+    colors: {
+      ...navigationTheme.colors,
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.card,
+      text: colors.text,
+      border: colors.border,
+      notification: colors.primary,
+    },
+  };
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <NavigationThemeProvider value={customTheme}>
       <Stack>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <Stack.Screen
+          name="modal"
+          options={{ presentation: "modal", title: "Modal" }}
+        />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+      <StatusBar style={theme === "dark" ? "light" : "dark"} />
+    </NavigationThemeProvider>
   );
 }
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <RootLayoutNav />
-      </AuthProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <RootLayoutNav />
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

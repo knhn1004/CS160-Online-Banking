@@ -154,4 +154,3 @@ export const UserOnboardSchema = z.object({
 });
 
 export type UserOnboardData = z.infer<typeof UserOnboardSchema>;
-

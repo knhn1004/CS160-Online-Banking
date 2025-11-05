@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import type { User, Session } from '@supabase/supabase-js';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: User | null;
@@ -46,7 +46,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       return { error: error ? new Error(error.message) : null };
     } catch (error) {
-      return { error: error instanceof Error ? error : new Error('Sign in failed') };
+      return {
+        error: error instanceof Error ? error : new Error("Sign in failed"),
+      };
     }
   };
 
@@ -58,7 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       return { error: error ? new Error(error.message) : null };
     } catch (error) {
-      return { error: error instanceof Error ? error : new Error('Sign up failed') };
+      return {
+        error: error instanceof Error ? error : new Error("Sign up failed"),
+      };
     }
   };
 
@@ -67,7 +71,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, signIn, signUp, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -76,8 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
-
