@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 jobs:
-  lint:
+  lint-web:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,10 +33,10 @@ jobs:
             ${{ runner.os }}-pnpm-store-
       - name: Install deps
         run: pnpm install --frozen-lockfile
-      - name: Lint
+      - name: Lint (Web)
         run: pnpm run -s lint
 
-  typecheck:
+  typecheck-web:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -65,10 +65,10 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Prisma generate
         run: pnpm run -s prisma:generate
-      - name: Typecheck
+      - name: Typecheck (Web)
         run: pnpm run -s typecheck
 
-  test:
+  test-web:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -97,18 +97,18 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Prisma generate
         run: pnpm run -s prisma:generate
-      - name: Tests
+      - name: Tests (Web)
         run: pnpm run -s test
-      - name: Upload coverage
+      - name: Upload coverage (Web)
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
+          name: coverage-web
           path: coverage
 
   build:
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test]
+    needs: [lint-web, typecheck-web, test-web]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

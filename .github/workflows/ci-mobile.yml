@@ -1,0 +1,106 @@
+name: CI Mobile
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: mobile/pnpm-lock.yaml
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "store-path=$(pnpm store path)" >> $GITHUB_OUTPUT
+      - name: pnpm store cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.store-path }}
+          key: ${{ runner.os }}-pnpm-store-mobile-${{ hashFiles('mobile/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-mobile-
+      - name: Install deps (Mobile)
+        run: cd mobile && pnpm install --frozen-lockfile
+      - name: Lint (Mobile)
+        working-directory: ./mobile
+        run: pnpm run -s lint
+
+  typecheck-mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: mobile/pnpm-lock.yaml
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "store-path=$(pnpm store path)" >> $GITHUB_OUTPUT
+      - name: pnpm store cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.store-path }}
+          key: ${{ runner.os }}-pnpm-store-mobile-${{ hashFiles('mobile/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-mobile-
+      - name: Install deps (Mobile)
+        run: cd mobile && pnpm install --frozen-lockfile
+      - name: Typecheck (Mobile)
+        working-directory: ./mobile
+        run: pnpm run -s typecheck
+
+  test-mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: mobile/pnpm-lock.yaml
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "store-path=$(pnpm store path)" >> $GITHUB_OUTPUT
+      - name: pnpm store cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.store-path }}
+          key: ${{ runner.os }}-pnpm-store-mobile-${{ hashFiles('mobile/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-mobile-
+      - name: Install deps (Mobile)
+        run: cd mobile && pnpm install --frozen-lockfile
+      - name: Tests (Mobile)
+        working-directory: ./mobile
+        run: pnpm run -s test
+      - name: Upload coverage (Mobile)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-mobile
+          path: mobile/coverage
