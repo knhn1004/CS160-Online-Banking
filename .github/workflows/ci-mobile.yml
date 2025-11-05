@@ -2,8 +2,12 @@ name: CI Mobile
 
 on:
   pull_request:
+    paths:
+      - 'mobile/**'
   push:
     branches: [main]
+    paths:
+      - 'mobile/**'
 
 jobs:
   lint-mobile:
