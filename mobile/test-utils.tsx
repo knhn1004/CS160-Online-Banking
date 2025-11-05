@@ -3,8 +3,12 @@ import { render, RenderOptions } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/contexts/theme-context';
 import { AuthProvider } from '@/contexts/auth-context';
-import { ToastProvider } from '@/components/ui/alert-dialog';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+// Mock ToastProvider to avoid issues in tests
+jest.mock('@/components/ui/alert-dialog', () => ({
+  ToastProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
 // Create a test query client with default options
 const createTestQueryClient = () => {
@@ -35,9 +39,7 @@ export function renderWithProviders(
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <ToastProvider>
-            <AuthProvider>{children}</AuthProvider>
-          </ToastProvider>
+          <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

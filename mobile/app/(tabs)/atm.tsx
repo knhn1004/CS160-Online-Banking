@@ -219,17 +219,42 @@ export default function AtmLocatorScreen() {
           },
         ]}
       >
-        <TextInput
-          style={[
-            styles.searchInput,
-            { color: colors.text, borderColor: colors.border },
-          ]}
-          placeholder="Enter address or use current location"
-          placeholderTextColor={colors.text + "80"}
-          value={searchAddress}
-          onChangeText={setSearchAddress}
-          onSubmitEditing={handleAddressSearch}
-        />
+        <View style={styles.searchInputContainer}>
+          <TextInput
+            style={[
+              styles.searchInput,
+              { color: colors.text, borderColor: colors.border },
+            ]}
+            placeholder="Enter address or use current location"
+            placeholderTextColor={colors.text + "80"}
+            value={searchAddress}
+            onChangeText={setSearchAddress}
+            onSubmitEditing={handleAddressSearch}
+          />
+          <TouchableOpacity
+            style={[
+              styles.locationIconButton,
+              {
+                backgroundColor: loading
+                  ? colors.accent + "20"
+                  : colors.accent + "15",
+              },
+            ]}
+            onPress={requestLocation}
+            disabled={loading}
+            activeOpacity={0.7}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.accent} />
+            ) : (
+              <IconSymbol
+                name="location.fill"
+                size={18}
+                color={colors.accent}
+              />
+            )}
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
           style={[
             styles.searchButton,
@@ -242,45 +267,13 @@ export default function AtmLocatorScreen() {
           onPress={handleAddressSearch}
           disabled={loading}
         >
-          <ThemedText
-            style={[
-              styles.searchButtonText,
-              {
-                color:
-                  theme === "dark" ? colors.primary : colors.primaryForeground,
-              },
-            ]}
-          >
-            Search
-          </ThemedText>
-        </TouchableOpacity>
-      </View>
-
-      {/* Location Button */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[
-            styles.locationButton,
-            {
-              backgroundColor: theme === "dark" ? colors.card : colors.primary,
-              borderWidth: theme === "dark" ? 1 : 0,
-              borderColor: theme === "dark" ? colors.primary : "transparent",
-            },
-          ]}
-          onPress={requestLocation}
-          disabled={loading}
-        >
-          <ThemedText
-            style={[
-              styles.locationButtonText,
-              {
-                color:
-                  theme === "dark" ? colors.primary : colors.primaryForeground,
-              },
-            ]}
-          >
-            {loading ? "Loading..." : "Use My Location"}
-          </ThemedText>
+          <IconSymbol
+            name="magnifyingglass"
+            size={20}
+            color={
+              theme === "dark" ? colors.primary : colors.primaryForeground
+            }
+          />
         </TouchableOpacity>
       </View>
 
@@ -356,7 +349,7 @@ export default function AtmLocatorScreen() {
                   <View style={styles.atmCardTitle}>
                     <IconSymbol
                       name="map.fill"
-                      size={20}
+                      size={14}
                       color={colors.primary}
                     />
                     <ThemedText style={styles.atmName}>{atm.name}</ThemedText>
@@ -367,52 +360,40 @@ export default function AtmLocatorScreen() {
                     {formatDistance(atm.distance)}
                   </ThemedText>
                 </View>
-                <ThemedText style={[styles.atmAddress, { opacity: 0.7 }]}>
+                <ThemedText style={styles.atmAddress}>
                   {atm.vicinity}
                 </ThemedText>
-                {atm.rating && (
-                  <View style={styles.ratingContainer}>
-                    <ThemedText
-                      style={[styles.rating, { color: colors.success }]}
-                    >
-                      ⭐ {atm.rating.toFixed(1)}
-                    </ThemedText>
-                    {atm.user_ratings_total && (
+                <View style={styles.atmCardFooter}>
+                  {atm.rating && (
+                    <View style={styles.ratingContainer}>
                       <ThemedText
-                        style={[styles.ratingCount, { opacity: 0.6 }]}
+                        style={[styles.rating, { color: colors.success }]}
                       >
-                        ({atm.user_ratings_total} reviews)
+                        ⭐ {atm.rating.toFixed(1)}
                       </ThemedText>
-                    )}
-                  </View>
-                )}
-                <TouchableOpacity
-                  style={[
-                    styles.mapButton,
-                    {
-                      backgroundColor:
-                        theme === "dark" ? colors.card : colors.primary,
-                      borderWidth: theme === "dark" ? 1 : 0,
-                      borderColor:
-                        theme === "dark" ? colors.primary : "transparent",
-                    },
-                  ]}
-                  onPress={() => openInMaps(atm)}
-                >
-                  <ThemedText
+                      {atm.user_ratings_total && (
+                        <ThemedText style={styles.ratingCount}>
+                          ({atm.user_ratings_total})
+                        </ThemedText>
+                      )}
+                    </View>
+                  )}
+                  <TouchableOpacity
                     style={[
-                      styles.mapButtonText,
+                      styles.mapIconButton,
                       {
-                        color:
-                          theme === "dark"
-                            ? colors.primary
-                            : colors.primaryForeground,
+                        backgroundColor: colors.accent + "20",
                       },
                     ]}
+                    onPress={() => openInMaps(atm)}
                   >
-                    Open in Maps
-                  </ThemedText>
-                </TouchableOpacity>
+                    <IconSymbol
+                      name="arrow.up.right.square.fill"
+                      size={16}
+                      color={colors.accent}
+                    />
+                  </TouchableOpacity>
+                </View>
               </TouchableOpacity>
             ))}
             </ScrollView>
@@ -440,9 +421,17 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     flexDirection: "row",
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     gap: 8,
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    position: "relative",
+    minWidth: 0,
   },
   searchInput: {
     flex: 1,
@@ -450,32 +439,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
+    paddingRight: 44,
     fontSize: 16,
+    minWidth: 0,
+  },
+  locationIconButton: {
+    position: "absolute",
+    right: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   searchButton: {
-    paddingHorizontal: 20,
+    width: 44,
     height: 44,
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
-  },
-  searchButtonText: {
-    fontWeight: "600",
-    fontSize: 16,
-  },
-  buttonContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  locationButton: {
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  locationButtonText: {
-    fontWeight: "600",
-    fontSize: 16,
+    flexShrink: 0,
   },
   loadingContainer: {
     flex: 1,
@@ -507,68 +490,74 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     flex: 1,
-    padding: 16,
+    padding: 12,
   },
   listTitle: {
-    marginBottom: 12,
+    marginBottom: 8,
+    fontSize: 15,
+    fontWeight: "600",
   },
   list: {
     flex: 1,
   },
   atmCard: {
-    padding: 16,
-    borderRadius: 12,
+    padding: 8,
+    borderRadius: 8,
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 6,
   },
   atmCardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 8,
+    marginBottom: 3,
   },
   atmCardTitle: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 5,
     marginRight: 8,
   },
   atmName: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "600",
   },
   atmDistance: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: "600",
   },
   atmAddress: {
-    fontSize: 14,
-    marginBottom: 8,
+    fontSize: 11,
+    marginBottom: 4,
+    opacity: 0.7,
+  },
+  atmCardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 3,
   },
   ratingContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
-    gap: 8,
+    gap: 3,
   },
   rating: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: "600",
   },
   ratingCount: {
-    fontSize: 12,
+    fontSize: 10,
+    opacity: 0.6,
   },
-  mapButton: {
-    paddingVertical: 10,
-    borderRadius: 8,
+  mapIconButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
-  },
-  mapButtonText: {
-    fontWeight: "600",
-    fontSize: 14,
   },
   emptyContainer: {
     flex: 1,

@@ -177,11 +177,15 @@ export async function GET(request: Request) {
     // Build where clause for filtering
     const whereClause: {
       internal_account_id: { in: number[] };
-      transaction_type: { in: ("internal_transfer" | "external_transfer")[] };
+      transaction_type: {
+        in: ("internal_transfer" | "external_transfer" | "deposit")[];
+      };
       created_at?: { gte?: Date; lte?: Date };
     } = {
       internal_account_id: { in: accountIds },
-      transaction_type: { in: ["internal_transfer", "external_transfer"] },
+      transaction_type: {
+        in: ["internal_transfer", "external_transfer", "deposit"],
+      },
     };
 
     if (type) {
@@ -259,6 +263,13 @@ export async function GET(request: Request) {
               (acc) => acc.id === transaction.internal_account_id,
             )?.account_number;
         destination_account_number = undefined;
+      } else if (transaction.transaction_type === "deposit") {
+        // For deposits, destination is always the internal account that received the deposit
+        // Deposits are always inbound, so no source account
+        source_account_number = undefined;
+        destination_account_number = currentUser.internal_accounts.find(
+          (acc) => acc.id === transaction.internal_account_id,
+        )?.account_number;
       }
 
       return {
@@ -274,6 +285,8 @@ export async function GET(request: Request) {
         external_routing_number: transaction.external_routing_number,
         external_account_number: transaction.external_account_number,
         external_nickname: transaction.external_nickname,
+        check_image_url: transaction.check_image_url || undefined,
+        check_number: transaction.check_number || undefined,
       };
     });
 

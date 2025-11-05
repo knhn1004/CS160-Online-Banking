@@ -101,9 +101,7 @@ export type ExternalTransferData = z.infer<typeof ExternalTransferSchema>;
 export const TransferHistoryQuerySchema = z.object({
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100).default(20),
-  type: z
-    .enum(["internal_transfer", "external_transfer", "deposit"])
-    .optional(),
+  type: z.enum(["internal_transfer", "external_transfer", "deposit"]).optional(),
   start_date: z.string().datetime().optional(),
   end_date: z.string().datetime().optional(),
 });
@@ -143,11 +141,7 @@ export const TransferHistoryItemSchema = z.object({
   created_at: z.string().datetime(),
   amount: z.number(),
   status: z.enum(["approved", "denied"]),
-  transaction_type: z.enum([
-    "internal_transfer",
-    "external_transfer",
-    "deposit",
-  ]),
+  transaction_type: z.enum(["internal_transfer", "external_transfer", "deposit"]),
   direction: z.enum(["inbound", "outbound"]),
   source_account_number: z.string().optional(),
   destination_account_number: z.string().optional(),
@@ -168,3 +162,4 @@ export const TransferResponseSchema = z.object({
 });
 
 export type TransferResponse = z.infer<typeof TransferResponseSchema>;
+

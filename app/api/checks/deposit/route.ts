@@ -167,11 +167,21 @@ export async function POST(request: Request) {
     // Extract check data using Groq Vision API
     const extractionResult = await extractCheckDataFromImage(imageUrlForGroq);
 
+    // If extraction failed, return error immediately with helpful message
+    if (!extractionResult.success) {
+      return json(400, {
+        error: extractionResult.error || "Failed to process check image",
+        message:
+          extractionResult.error ||
+          "The uploaded image could not be processed as a check. Please ensure you uploaded a clear image of a valid bank check.",
+      });
+    }
+
     // Validate extracted data
     const validationResult = validateExtractedCheck(extractionResult);
 
     if (!validationResult.valid) {
-      // Create denied transaction
+      // Create denied transaction for tracking purposes
       return await prisma.$transaction(async (tx) => {
         const deniedTransaction = await createDeniedTransaction(tx, {
           internal_account_id: account.id,
@@ -187,14 +197,19 @@ export async function POST(request: Request) {
           data: {
             check_image_url: check_image_url,
             check_number: extractionResult.success
-              ? extractionResult.data.check_number || null
+              ? extractionResult.data.check_number
+                ? extractionResult.data.check_number.slice(0, 12)
+                : null
               : null,
           },
         });
 
-        return json(403, {
+        return json(400, {
           status: "Check deposit denied",
           error: validationResult.error,
+          message:
+            validationResult.error ||
+            "The check image could not be validated. Please ensure the image is clear and shows all required check information.",
           transaction_id: deniedTransaction.id,
         });
       });
@@ -224,7 +239,7 @@ export async function POST(request: Request) {
         return json(200, {
           status: "Deposit already processed (idempotency key found)",
           transaction_id: existing.id,
-          amount: Number(amount),
+          amount: Math.round(Number(amount) * 100), // Convert dollars to cents
         });
       }
 
@@ -256,16 +271,22 @@ export async function POST(request: Request) {
         where: { id: result.transaction.id },
         data: {
           check_image_url: check_image_url,
-          check_number: extractedData.check_number || null,
-          external_routing_number: extractedData.routing_number || null,
-          external_account_number: extractedData.account_number || null,
+          check_number: extractedData.check_number
+            ? extractedData.check_number.slice(0, 12)
+            : null,
+          external_routing_number: extractedData.routing_number
+            ? extractedData.routing_number.slice(0, 9)
+            : null,
+          external_account_number: extractedData.account_number
+            ? extractedData.account_number.slice(0, 17)
+            : null,
         },
       });
 
       return json(200, {
         status: result.duplicate ? result.message : "Check deposit successful",
         transaction_id: result.transaction.id,
-        amount: Number(amount),
+        amount: Math.round(Number(amount) * 100), // Convert dollars to cents
         validation_result: {
           extracted_amount: extractedData.amount,
           routing_number: extractedData.routing_number,

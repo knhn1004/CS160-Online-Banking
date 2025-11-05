@@ -78,7 +78,7 @@ export function AccountCard({ account }: AccountCardProps) {
             </ThemedText>
             <IconSymbol
               name="chevron.right"
-              size={20}
+              size={16}
               color={colors.icon}
               style={styles.chevron}
             />
@@ -94,43 +94,44 @@ export function AccountCard({ account }: AccountCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 8,
+    padding: 10,
     borderWidth: 1,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 8,
+    alignItems: "center",
+    marginBottom: 4,
   },
   accountInfo: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
     marginRight: 8,
+    flexWrap: "wrap",
   },
   accountType: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    marginLeft: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 6,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "600",
-    lineHeight: 16,
+    lineHeight: 14,
   },
   balanceRow: {
     flexDirection: "row",
     alignItems: "center",
   },
   balance: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "600",
     marginRight: 4,
   },
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   accountNumber: {
-    fontSize: 14,
+    fontSize: 12,
     opacity: 0.6,
   },
 });

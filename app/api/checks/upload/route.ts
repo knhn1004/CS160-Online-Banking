@@ -79,9 +79,11 @@ export async function POST(request: Request) {
     }
 
     // Upload to Supabase Storage
+    const authHeader = request.headers.get("Authorization");
     const { url, path } = await uploadCheckToSupabase(
       file,
       auth.supabaseUser.id,
+      authHeader || undefined,
     );
 
     return json(200, {
