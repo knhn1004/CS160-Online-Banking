@@ -41,17 +41,16 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + 16 },
-        ]}
-      >
+    <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
         <ThemedText type="title" style={styles.title}>
           Settings
         </ThemedText>
+      </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+      >
 
         {/* Appearance Section */}
         <View style={styles.section}>
@@ -151,6 +150,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
   scrollView: {
     flex: 1,
   },
@@ -158,7 +162,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   title: {
-    marginBottom: 24,
+    marginBottom: 0,
   },
   section: {
     marginBottom: 24,

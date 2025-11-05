@@ -208,6 +208,19 @@ export default function AtmLocatorScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Header */}
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: insets.top + 16,
+          },
+        ]}
+      >
+        <ThemedText type="title" style={styles.title}>
+          ATM Locator
+        </ThemedText>
+      </View>
       {/* Search Bar */}
       <View
         style={[
@@ -215,7 +228,7 @@ export default function AtmLocatorScreen() {
           {
             backgroundColor: colors.card,
             borderColor: colors.border,
-            paddingTop: insets.top + 16,
+            paddingTop: 16,
           },
         ]}
       >
@@ -418,6 +431,13 @@ export default function AtmLocatorScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  title: {
+    marginBottom: 0,
   },
   searchContainer: {
     flexDirection: "row",
