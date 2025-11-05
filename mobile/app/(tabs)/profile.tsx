@@ -181,17 +181,16 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={[
-        styles.container,
-        { paddingTop: insets.top + 16 },
-      ]}
-    >
-      <ThemedView style={styles.content}>
+    <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
         <ThemedText type="title" style={styles.title}>
           Account Information
         </ThemedText>
-
+      </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+      >
         <View style={styles.form}>
           <form.Field
             name="first_name"
@@ -525,8 +524,8 @@ export default function ProfileScreen() {
             )}
           </TouchableOpacity>
         </View>
-      </ThemedView>
-    </ScrollView>
+      </ScrollView>
+    </ThemedView>
   );
 }
 
@@ -540,14 +539,21 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   container: {
-    flexGrow: 1,
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
-    flex: 1,
-    padding: 20,
+    padding: 16,
   },
   title: {
-    marginBottom: 24,
+    marginBottom: 0,
   },
   form: {
     gap: 16,
