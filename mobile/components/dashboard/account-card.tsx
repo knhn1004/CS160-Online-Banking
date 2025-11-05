@@ -5,7 +5,7 @@ import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useTheme } from "@/contexts/theme-context";
 import { Colors } from "@/constants/theme";
-import type { InternalAccount } from "@/lib/api";
+import type { InternalAccount } from "@/lib/types";
 
 interface AccountCardProps {
   account: InternalAccount;

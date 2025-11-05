@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useLocalSearchParams, Stack } from "expo-router";
-import { useState, useEffect, useCallback } from "react";
+import { useMemo } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import Toast from "react-native-toast-message";
@@ -15,7 +15,7 @@ import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useTheme } from "@/contexts/theme-context";
 import { Colors } from "@/constants/theme";
-import { api, type InternalAccount, type Transaction } from "@/lib/api";
+import { useAccounts, useTransactions } from "@/lib/queries";
 import { TransactionItem } from "@/components/dashboard/transaction-item";
 
 export default function AccountDetailScreen() {
@@ -23,47 +23,27 @@ export default function AccountDetailScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const colors = Colors[theme];
-  const [account, setAccount] = useState<InternalAccount | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadAccountData = useCallback(async () => {
-    try {
-      setError(null);
-      const accountId = parseInt(params.accountId as string);
+  const accountId = parseInt(params.accountId as string);
 
-      const [accountsRes, transactionsRes] = await Promise.all([
-        api.getAccounts(),
-        api.getTransactions(50),
-      ]);
+  // Use TanStack Query hooks
+  const { data: accountsData, isLoading: accountsLoading } = useAccounts();
+  const { data: transactionsData, isLoading: transactionsLoading } =
+    useTransactions(50);
 
-      const foundAccount = accountsRes.accounts.find(
-        (acc) => acc.id === accountId,
-      );
-      if (!foundAccount) {
-        setError("Account not found");
-        return;
-      }
+  const account = useMemo(() => {
+    return accountsData?.accounts.find((acc) => acc.id === accountId);
+  }, [accountsData?.accounts, accountId]);
 
-      const accountTransactions = transactionsRes.transactions.filter(
-        (tx) => tx.internal_account_id === accountId,
-      );
+  const transactions = useMemo(() => {
+    if (!transactionsData?.transactions) return [];
+    return transactionsData.transactions.filter(
+      (tx) => tx.internal_account_id === accountId,
+    );
+  }, [transactionsData?.transactions, accountId]);
 
-      setAccount(foundAccount);
-      setTransactions(accountTransactions);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load account details",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [params.accountId]);
-
-  useEffect(() => {
-    loadAccountData();
-  }, [loadAccountData]);
+  const isLoading = accountsLoading || transactionsLoading;
+  const error = !account && !isLoading ? "Account not found" : null;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -97,7 +77,7 @@ export default function AccountDetailScreen() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <ThemedView style={styles.loadingContainer}>
         <Stack.Screen

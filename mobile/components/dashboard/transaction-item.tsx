@@ -3,7 +3,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useTheme } from "@/contexts/theme-context";
 import { Colors } from "@/constants/theme";
-import type { Transaction } from "@/lib/api";
+import type { Transaction } from "@/lib/types";
 
 interface TransactionItemProps {
   transaction: Transaction;
