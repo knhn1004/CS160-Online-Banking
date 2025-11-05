@@ -151,6 +151,35 @@ export const BillPayRuleCreateSchema = z
 
 export type BillPayRuleCreateData = z.infer<typeof BillPayRuleCreateSchema>;
 
+// BillPayRule update schema (all fields optional)
+export const BillPayRuleUpdateSchema = z
+  .object({
+    source_account_id: z.number().int().positive().optional(),
+    payee_id: z.number().int().positive().optional(),
+    amount: AmountSchema.optional(),
+    frequency: CronExpressionSchema.optional(),
+    start_time: z.string().datetime("Invalid start time format").optional(),
+    end_time: z
+      .string()
+      .datetime("Invalid end time format")
+      .nullable()
+      .optional(),
+  })
+  .refine(
+    (data) =>
+      data.source_account_id !== undefined ||
+      data.payee_id !== undefined ||
+      data.amount !== undefined ||
+      data.frequency !== undefined ||
+      data.start_time !== undefined ||
+      data.end_time !== undefined,
+    {
+      message: "At least one field must be provided for update",
+    },
+  );
+
+export type BillPayRuleUpdateData = z.infer<typeof BillPayRuleUpdateSchema>;
+
 // BillPayPayee response schema
 export const BillPayPayeeResponseSchema = z.object({
   id: z.number(),

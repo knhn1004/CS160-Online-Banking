@@ -48,6 +48,14 @@ export default function TransfersScreen() {
       route: "/(tabs)/transfers/billpay-transfer",
     },
     {
+      id: "billpay-rules",
+      label: "Bill Pay Rules",
+      icon: "list.bullet",
+      description: "View and manage your rules",
+      color: colors.warning,
+      route: "/(tabs)/transfers/billpay-rules",
+    },
+    {
       id: "check",
       label: "Check Deposit",
       icon: "camera.fill",

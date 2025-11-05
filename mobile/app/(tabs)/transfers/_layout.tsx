@@ -42,6 +42,14 @@ export default function TransfersLayout() {
         }}
       />
       <Stack.Screen
+        name="billpay-rules"
+        options={{
+          headerShown: true,
+          animation: "slide_from_right",
+          headerBackTitle: "",
+        }}
+      />
+      <Stack.Screen
         name="check-deposit"
         options={{
           headerShown: true,
