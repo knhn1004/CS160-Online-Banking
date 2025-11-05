@@ -240,12 +240,14 @@ describe("ProfileScreen", () => {
 
   it("shows saving state during submission", async () => {
     mockGetProfile.mockResolvedValue(mockProfile);
-    mockUpdateProfile.mockImplementation(
-      () =>
-        new Promise((resolve) =>
-          setTimeout(() => resolve(mockProfile), 100),
-        ),
-    );
+    
+    // Create a promise that we can control
+    let resolvePromise: (value: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    
+    mockUpdateProfile.mockImplementation(() => pendingPromise);
 
     const { getByDisplayValue, getByText, queryByText } = renderWithProviders(
       <ProfileScreen />,
@@ -258,13 +260,22 @@ describe("ProfileScreen", () => {
     const submitButton = getByText("Save Changes");
     fireEvent.press(submitButton);
 
-    // Check for saving state - "Save Changes" text should be gone
-    // and ActivityIndicator should appear (we can't easily check for ActivityIndicator,
-    // but we can verify the button text changes or the button is no longer accessible)
-    await waitFor(() => {
-      expect(queryByText("Save Changes")).toBeFalsy();
-    });
+    // Wait for the mutation to start and UI to update
+    // Give React time to process the state change
+    await new Promise((resolve) => setImmediate(resolve));
+    
+    // The button should show ActivityIndicator (and hide "Save Changes" text)
+    await waitFor(
+      () => {
+        expect(queryByText("Save Changes")).toBeFalsy();
+      },
+      { timeout: 1000 },
+    );
 
+    // Resolve the promise to complete the mutation
+    resolvePromise!(mockProfile);
+
+    // Wait for success toast
     await waitFor(
       () => {
         expect(Toast.show).toHaveBeenCalledWith(
