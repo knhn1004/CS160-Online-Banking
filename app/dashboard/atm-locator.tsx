@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { Map, Marker, APIProvider } from "@vis.gl/react-google-maps";
+import {
+  Map,
+  Marker,
+  APIProvider,
+  MapCameraChangedEvent,
+  Pin,
+  MapControl,
+  ControlPosition,
+} from "@vis.gl/react-google-maps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -162,6 +170,7 @@ export function AtmLocator() {
         };
         setUserLocation(location);
         setMapCenter(location);
+        setZoom(15);
         await searchATMs(location.lat, location.lng);
       },
       (error) => {
@@ -200,6 +209,14 @@ export function AtmLocator() {
     }
   };
 
+  // Handle user moving map view & zoom:
+  const [zoom, setZoom] = useState(13);
+  const handleCameraChanged = useCallback((ev: MapCameraChangedEvent) => {
+    const { center, zoom } = ev.detail;
+    setMapCenter(center);
+    setZoom(zoom);
+  }, []);
+
   // Handle address search
   const handleAddressSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,6 +229,7 @@ export function AtmLocator() {
       const location = { lat: result.lat, lng: result.lng };
       setUserLocation(location);
       setMapCenter(location);
+      setZoom(15);
       await searchATMs(location.lat, location.lng);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to find address");
@@ -301,14 +319,18 @@ export function AtmLocator() {
         {/* Map */}
         <div className="h-[600px] w-full rounded-lg border">
           {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? (
-            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}>
+            <APIProvider
+              apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+              libraries={["marker"]}
+            >
               <Map
                 center={mapCenter}
-                zoom={13}
+                zoom={zoom}
                 gestureHandling="greedy"
                 disableDefaultUI={false}
                 className="h-full w-full rounded-lg"
                 styles={mapTheme.styles}
+                onCameraChanged={handleCameraChanged}
               >
                 {atms.map((atm) => (
                   <Marker
@@ -317,6 +339,30 @@ export function AtmLocator() {
                     onClick={() => setSelectedAtm(atm)}
                   />
                 ))}
+
+                {userLocation && (
+                  <Marker
+                    position={userLocation}
+                    icon="https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png"
+                  />
+                )}
+                <MapControl position={ControlPosition.RIGHT_TOP}>
+                  <div className="p-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (!userLocation) return;
+                        setMapCenter(userLocation);
+                        setZoom(15);
+                      }}
+                      disabled={!userLocation}
+                      className="shadow"
+                    >
+                      Center on Me
+                    </Button>
+                  </div>
+                </MapControl>
               </Map>
             </APIProvider>
           ) : (
@@ -357,7 +403,11 @@ export function AtmLocator() {
                       ? "border-blue-500 bg-blue-50"
                       : "hover:bg-gray-50"
                   }`}
-                  onClick={() => setSelectedAtm(atm)}
+                  onClick={() => {
+                    setSelectedAtm(atm);
+                    setMapCenter(atm.geometry.location);
+                    setZoom(17);
+                  }}
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="font-medium text-sm">{atm.name}</h4>
