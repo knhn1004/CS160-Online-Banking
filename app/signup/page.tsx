@@ -565,7 +565,7 @@ export default function SignupPage() {
                   field.handleChange(e.target.value as typeof field.state.value)
                 }
                 required
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Select State/Territory</option>
                 {US_STATES.map((state) => (
