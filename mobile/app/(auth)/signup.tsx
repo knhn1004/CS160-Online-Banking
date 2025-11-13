@@ -1,3 +1,4 @@
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect } from "react";
 import {
   View,
@@ -118,11 +119,12 @@ export default function SignupScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <ThemedView style={styles.content}>
-        <ThemedText type="title" style={styles.title}>
-          Sign Up
-        </ThemedText>
+    <SafeAreaView style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <ThemedView style={styles.content}>
+          <ThemedText type="title" style={styles.title}>
+            Sign In
+          </ThemedText>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
@@ -357,7 +359,8 @@ export default function SignupScreen() {
         </View>
       </ThemedView>
     </ScrollView>
-  );
+  </SafeAreaView>
+);
 }
 
 const styles = StyleSheet.create({
