@@ -139,6 +139,26 @@ class ApiClient {
     );
   }
 
+  async getAccountBalances(): Promise<{
+    accounts: Array<{
+      id: number;
+      account_number: string;
+      balance: number;
+      created_at: string;
+    }>;
+    timestamp: string;
+  }> {
+    return this.request<{
+      accounts: Array<{
+        id: number;
+        account_number: string;
+        balance: number;
+        created_at: string;
+      }>;
+      timestamp: string;
+    }>("/api/accounts/balance");
+  }
+
   async createAccount(data: {
     account_type: "checking" | "savings";
     initial_deposit?: number;
@@ -202,6 +222,111 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(data),
     });
+  }
+
+  // API Keys API methods
+  async getApiKeys(): Promise<{
+    api_keys: Array<{
+      id: number;
+      key_prefix: string;
+      account_id: number;
+      account_number: string;
+      account_type: "checking" | "savings";
+      expires_at: string | null;
+      is_active: boolean;
+      created_at: string;
+      last_used_at: string | null;
+    }>;
+  }> {
+    return this.request<{
+      api_keys: Array<{
+        id: number;
+        key_prefix: string;
+        account_id: number;
+        account_number: string;
+        account_type: "checking" | "savings";
+        expires_at: string | null;
+        is_active: boolean;
+        created_at: string;
+        last_used_at: string | null;
+      }>;
+    }>("/api/api-keys");
+  }
+
+  async generateApiKey(data: {
+    account_id: number;
+    expires_at?: string | null;
+  }): Promise<{
+    api_key: string;
+    key_id: number;
+    key_prefix: string;
+    account_id: number;
+    account_number: string;
+    expires_at: string | null;
+    created_at: string;
+  }> {
+    return this.request<{
+      api_key: string;
+      key_id: number;
+      key_prefix: string;
+      account_id: number;
+      account_number: string;
+      expires_at: string | null;
+      created_at: string;
+    }>("/api/api-keys/generate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async revokeApiKey(keyId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/api-keys/${keyId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async makeApiKeyTransaction(
+    apiKey: string,
+    transactionType: "credit" | "debit",
+    amount: number,
+    accountNumber?: string,
+  ): Promise<{
+    status: string;
+    transaction_id?: number;
+    amount: number;
+  }> {
+    // This endpoint uses API key auth, not JWT, so we don't use this.request()
+    const queryParams = new URLSearchParams();
+    queryParams.append("access_token", apiKey);
+    const body: {
+      transaction_type: "credit" | "debit";
+      amount: number;
+      account_number?: string;
+    } = {
+      transaction_type: transactionType,
+      amount,
+    };
+    if (accountNumber) {
+      body.account_number = accountNumber;
+    }
+
+    const response = await fetch(`${API_URL}/api/api-keys/transactions?${queryParams.toString()}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error: ApiError & { error?: string; message?: string } = await response.json().catch(() => ({
+        message: `HTTP error! status: ${response.status}`,
+      }));
+      const errorMessage = error.message || error.error || `HTTP error! status: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
   }
 
   // Transfer API methods

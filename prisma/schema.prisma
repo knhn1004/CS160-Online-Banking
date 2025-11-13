@@ -29,6 +29,7 @@ model User {
   external_accounts ExternalAccount[]
   transfer_rules    TransferRule[]
   billpay_rules     BillPayRule[]
+  api_keys          ApiKey[]
 
   @@map("users")
 }
@@ -113,6 +114,7 @@ model InternalAccount {
   transfer_rules_to   TransferRule[] @relation("TransferRuleDestinationInternal")
   billpay_rules       BillPayRule[]
   transactions        Transaction[]
+  api_keys            ApiKey[]
 
   @@index([user_id])
   @@map("internal_accounts")
@@ -280,4 +282,24 @@ model BillPayPayee {
 
   @@index([business_name])
   @@map("billpay_payees")
+}
+
+model ApiKey {
+  id                 Int       @id @default(autoincrement())
+  user_id            Int
+  internal_account_id Int
+  api_key_hash       String    @unique @db.VarChar(255)
+  key_prefix         String    @db.VarChar(20) // First 10 chars like "cs_160xxx" for display
+  expires_at         DateTime?
+  is_active          Boolean   @default(true)
+  created_at         DateTime  @default(now())
+  last_used_at       DateTime?
+
+  user            User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  internal_account InternalAccount @relation(fields: [internal_account_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([internal_account_id])
+  @@index([api_key_hash])
+  @@map("api_keys")
 }

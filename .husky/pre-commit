@@ -1,4 +1,31 @@
 #!/usr/bin/env sh
 
-# Run lint-staged directly; Husky v9+ no longer requires sourcing husky.sh
-pnpm exec lint-staged
+# Cross-platform PATH setup for pnpm
+# Unix/macOS: Homebrew and common locations
+if [ -d "/opt/homebrew/bin" ]; then
+  export PATH="$PATH:/opt/homebrew/bin"
+fi
+if [ -d "/usr/local/bin" ]; then
+  export PATH="$PATH:/usr/local/bin"
+fi
+if [ -d "$HOME/.local/share/pnpm" ]; then
+  export PATH="$PATH:$HOME/.local/share/pnpm"
+fi
+
+# Windows: Common npm/pnpm locations (if running in Git Bash or WSL)
+if [ -d "$APPDATA/npm" ]; then
+  export PATH="$PATH:$APPDATA/npm"
+fi
+if [ -d "$LOCALAPPDATA/pnpm" ]; then
+  export PATH="$PATH:$LOCALAPPDATA/pnpm"
+fi
+
+# Try to find pnpm in PATH or use npx as fallback
+if command -v pnpm >/dev/null 2>&1; then
+  pnpm exec lint-staged
+elif command -v npx >/dev/null 2>&1; then
+  npx --yes pnpm exec lint-staged
+else
+  echo "Error: pnpm not found. Please install pnpm: npm install -g pnpm"
+  exit 1
+fi

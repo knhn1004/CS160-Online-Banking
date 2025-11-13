@@ -78,19 +78,39 @@ export default function TransfersScreen() {
       style={[styles.container, { paddingTop: insets.top }]}
     >
       <View style={styles.header}>
-        <ThemedText type="title" style={styles.title}>
-          Transfers
-        </ThemedText>
-        <ThemedText
-          style={[
-            styles.subtitle,
-            {
-              color: colors.mutedForeground,
-            },
-          ]}
-        >
-          Choose a transfer option
-        </ThemedText>
+        <View style={styles.headerTop}>
+          <View style={styles.headerTextContainer}>
+            <ThemedText type="title" style={styles.title}>
+              Transfers
+            </ThemedText>
+            <ThemedText
+              style={[
+                styles.subtitle,
+                {
+                  color: colors.mutedForeground,
+                },
+              ]}
+            >
+              Choose a transfer option
+            </ThemedText>
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.apiKeyButton,
+              {
+                backgroundColor: colors.primary,
+              },
+            ]}
+            onPress={() => router.push("/(tabs)/transfers/api-keys")}
+            activeOpacity={0.7}
+          >
+            <IconSymbol
+              name="key.fill"
+              size={20}
+              color={colors.primaryForeground}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
       <ScrollView
         style={styles.scrollView}
@@ -158,12 +178,28 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
   },
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
   title: {
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
     marginBottom: 16,
+  },
+  apiKeyButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
   },
   scrollView: {
     flex: 1,

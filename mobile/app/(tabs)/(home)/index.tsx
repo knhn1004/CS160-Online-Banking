@@ -11,7 +11,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useTheme } from "@/contexts/theme-context";
 import { Colors } from "@/constants/theme";
-import { useAccounts, useTransactions, useProfile } from "@/lib/queries";
+import { useAccounts, useTransactions, useProfile, useAccountBalancePolling } from "@/lib/queries";
 import { BalanceCard } from "@/components/dashboard/balance-card";
 import { AccountCard } from "@/components/dashboard/account-card";
 import { TransactionItem } from "@/components/dashboard/transaction-item";
@@ -20,6 +20,9 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const colors = Colors[theme];
+
+  // Poll account balances every 5 seconds to detect external API key transactions
+  useAccountBalancePolling(5000);
 
   // Use TanStack Query hooks
   const {

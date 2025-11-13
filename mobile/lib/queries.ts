@@ -3,6 +3,7 @@
  * Provides typed hooks with proper caching and invalidation
  */
 
+import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "./api";
 import type {
@@ -124,5 +125,78 @@ export function useCreateAccount() {
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions() });
     },
   });
+}
+
+// API Key mutations
+export function useMakeApiKeyTransaction() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: {
+      apiKey: string;
+      transactionType: "credit" | "debit";
+      amount: number;
+      accountNumber?: string;
+    }) =>
+      api.makeApiKeyTransaction(
+        params.apiKey,
+        params.transactionType,
+        params.amount,
+        params.accountNumber,
+      ),
+    onSuccess: () => {
+      // Invalidate queries to refresh balances and transactions after API key transaction
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions() });
+      queryClient.invalidateQueries({ queryKey: ["transferHistory"] });
+    },
+  });
+}
+
+// Polling hook for account balances (to detect external API key transactions)
+export function useAccountBalancePolling(intervalMs: number = 5000) {
+  const queryClient = useQueryClient();
+  const previousBalancesRef = useRef<Map<number, number>>(new Map());
+
+  useEffect(() => {
+    const pollBalances = async () => {
+      try {
+        const balanceData = await api.getAccountBalances();
+        const currentBalances = new Map<number, number>();
+
+        // Check if any balances have changed
+        let hasChanged = false;
+        for (const account of balanceData.accounts) {
+          currentBalances.set(account.id, account.balance);
+          const previousBalance = previousBalancesRef.current.get(account.id);
+          if (previousBalance !== undefined && previousBalance !== account.balance) {
+            hasChanged = true;
+          }
+        }
+
+        // If balances changed, invalidate queries to refresh data
+        if (hasChanged || previousBalancesRef.current.size === 0) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
+          queryClient.invalidateQueries({ queryKey: queryKeys.transactions() });
+          queryClient.invalidateQueries({ queryKey: ["transferHistory"] });
+        }
+
+        previousBalancesRef.current = currentBalances;
+      } catch (error) {
+        // Silently fail polling errors to avoid spamming console
+        console.debug("Balance polling error:", error);
+      }
+    };
+
+    // Poll immediately on mount
+    pollBalances();
+
+    // Set up interval polling
+    const intervalId = setInterval(pollBalances, intervalMs);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [intervalMs, queryClient]);
 }
 
