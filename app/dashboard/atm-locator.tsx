@@ -6,7 +6,6 @@ import {
   Marker,
   APIProvider,
   MapCameraChangedEvent,
-  Pin,
   MapControl,
   ControlPosition,
 } from "@vis.gl/react-google-maps";

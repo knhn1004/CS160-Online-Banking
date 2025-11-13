@@ -43,7 +43,7 @@ jest.mock('./account-selector', () => {
   const React = require('react');
   const { View, Text } = require('react-native');
   return {
-    AccountSelector: ({ selectedAccountId, onSelect, label }: any) => (
+    AccountSelector: ({ selectedAccountId: _selectedAccountId, onSelect: _onSelect, label }: any) => (
       <View testID={`account-selector-${label}`}>
         <Text>{label}</Text>
       </View>
@@ -56,7 +56,7 @@ jest.mock('./payee-selector', () => {
   const React = require('react');
   const { View, Text } = require('react-native');
   return {
-    PayeeSelector: ({ selectedPayeeId, onSelect, label }: any) => (
+    PayeeSelector: ({ selectedPayeeId: _selectedPayeeId, onSelect: _onSelect, label }: any) => (
       <View testID={`payee-selector`}>
         <Text>{label}</Text>
       </View>
@@ -69,7 +69,7 @@ jest.mock('./frequency-selector', () => {
   const React = require('react');
   const { View, Text } = require('react-native');
   return {
-    FrequencySelector: ({ selectedFrequency, onSelect, label }: any) => (
+    FrequencySelector: ({ selectedFrequency: _selectedFrequency, onSelect: _onSelect, label }: any) => (
       <View testID={`frequency-selector`}>
         <Text>{label}</Text>
       </View>

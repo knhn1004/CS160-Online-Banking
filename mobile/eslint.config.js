@@ -8,6 +8,15 @@ module.exports = defineConfig([
     ignores: ["dist/*"],
   },
   {
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["error", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+      }],
+      "no-unused-vars": "off", // Turn off base rule as it conflicts with @typescript-eslint/no-unused-vars
+    },
+  },
+  {
     files: ["**/jest.setup.js", "**/*.test.{ts,tsx}", "**/__tests__/**/*.{ts,tsx}"],
     languageOptions: {
       globals: {

@@ -28,7 +28,7 @@ jest.mock('./account-selector', () => {
   const React = require('react');
   const { View, Text } = require('react-native');
   return {
-    AccountSelector: ({ selectedAccountId, onSelect, label }: any) => (
+    AccountSelector: ({ selectedAccountId: _selectedAccountId, onSelect: _onSelect, label }: any) => (
       <View testID={`account-selector-${label}`}>
         <Text>{label}</Text>
       </View>

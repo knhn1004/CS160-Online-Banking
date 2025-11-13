@@ -37,6 +37,11 @@ const eslintConfig = [
     },
     rules: {
       "prettier/prettier": ["error"],
+      "@typescript-eslint/no-unused-vars": ["error", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+      }],
+      "no-unused-vars": "off", // Turn off base rule as it conflicts with @typescript-eslint/no-unused-vars
     },
   },
 ];
