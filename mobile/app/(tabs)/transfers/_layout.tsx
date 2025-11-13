@@ -73,6 +73,15 @@ export default function TransfersLayout() {
           headerBackTitle: "",
         }}
       />
+      <Stack.Screen
+        name="api-keys"
+        options={{
+          title: "API Keys",
+          headerShown: true,
+          animation: "slide_from_right",
+          headerBackTitle: "",
+        }}
+      />
     </Stack>
   );
 }

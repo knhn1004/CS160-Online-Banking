@@ -144,3 +144,36 @@ If you want to restrict access so users can only access their own check images:
 
 1. Go to Storage > Policies for the `checks` bucket
 2. Add policies for authenticated users to upload/read files in their own folder (`{auth.uid()}/*`)
+
+3. API Key Transactions
+
+The API supports making credit (deposit) and debit (withdrawal) transactions using API keys. These endpoints use the `access_token` query parameter for authentication (no JWT required).
+
+**Deposit (Credit) Transaction:**
+
+```bash
+curl -X POST "http://localhost:3000/api/api-keys/transactions?access_token=YOUR_API_KEY_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transaction_type": "credit",
+    "amount": 100.50
+  }'
+```
+
+**Withdrawal (Debit) Transaction:**
+
+```bash
+curl -X POST "http://localhost:3000/api/api-keys/transactions?access_token=YOUR_API_KEY_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transaction_type": "debit",
+    "amount": 50.00
+  }'
+```
+
+**Notes:**
+
+- Replace `YOUR_API_KEY_HERE` with your actual API key (format: `cs_160...`)
+- Amounts are in dollars with up to 2 decimal places (e.g., `100.50` for $100.50, or `100` for $100.00)
+- The API key must be generated via `/api/api-keys/generate` endpoint (requires JWT)
+- Transactions are idempotent - duplicate requests with the same idempotency key will return the original transaction
