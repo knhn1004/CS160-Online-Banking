@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
 import React from "react";
@@ -21,7 +21,12 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-// Mock Supabase client with proper async handling
+// Mock Boxes component to avoid heavy rendering
+vi.mock("@/components/ui/background-boxes", () => ({
+  Boxes: () => <div data-testid="background-boxes" />,
+}));
+
+// Mock Supabase client with fast-resolving mocks
 const mockGetUser = vi.fn();
 const mockUnsubscribe = vi.fn();
 const mockOnAuthStateChange = vi.fn();
@@ -50,61 +55,48 @@ describe("Landing Page", () => {
 
   it("renders the main headline", async () => {
     render(<Page />);
-    // Wait for async auth check to complete
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Simple, Secure, and Smart Banking/i),
-      ).toBeInTheDocument();
-    });
+    // Use findByText which is optimized for async queries
+    expect(
+      await screen.findByText(/Simple, Secure, and Smart Banking/i),
+    ).toBeInTheDocument();
   });
 
   it("renders the Get Started button", async () => {
     render(<Page />);
-    await waitFor(() => {
-      const buttons = screen.getAllByText(/Get Started/i);
-      expect(buttons.length).toBeGreaterThan(0);
-    });
+    // Wait for loading to complete and button to appear
+    const buttons = await screen.findAllByText(/Get Started/i);
+    expect(buttons.length).toBeGreaterThan(0);
   });
 
   it("renders the Sign In button", async () => {
     render(<Page />);
-    await waitFor(
-      () => {
-        const buttons = screen.getAllByText(/Sign In/i);
-        expect(buttons.length).toBeGreaterThan(0);
-      },
-      { timeout: 3000 },
-    );
+    const buttons = await screen.findAllByText(/Sign In/i);
+    expect(buttons.length).toBeGreaterThan(0);
   });
 
   it("renders the footer", async () => {
     render(<Page />);
-    // Wait for component to finish loading before checking footer
-    await waitFor(() => {
-      const footerText = screen.getAllByText(/CS160 Bank/i);
-      expect(footerText.length).toBeGreaterThan(0);
-    });
+    // Wait for footer text to appear
+    const footerText = await screen.findAllByText(/CS160 Bank/i);
+    expect(footerText.length).toBeGreaterThan(0);
     // Check that footer copyright text exists
     expect(screen.getByText(/All rights reserved/i)).toBeInTheDocument();
   });
 
   it("renders feature cards", async () => {
     render(<Page />);
-    // Wait for component to finish loading
-    await waitFor(() => {
-      // Use getAllByText since "Account Management" appears multiple times
-      const accountManagement = screen.getAllByText(/Account Management/i);
-      expect(accountManagement.length).toBeGreaterThan(0);
-    });
+    // Wait for feature cards to appear
+    const accountManagement = await screen.findAllByText(/Account Management/i);
+    expect(accountManagement.length).toBeGreaterThan(0);
     expect(screen.getByText(/Automated Bill Pay/i)).toBeInTheDocument();
     expect(screen.getByText(/ATM Locator/i)).toBeInTheDocument();
   });
 
   it("renders the CTA section", async () => {
     render(<Page />);
-    await waitFor(() => {
-      expect(screen.getByText(/Ready to get started\?/i)).toBeInTheDocument();
-    });
+    expect(
+      await screen.findByText(/Ready to get started\?/i),
+    ).toBeInTheDocument();
   });
 
   it("renders dashboard button when authenticated", async () => {
@@ -115,19 +107,13 @@ describe("Landing Page", () => {
     });
 
     render(<Page />);
-    await waitFor(() => {
-      const buttons = screen.getAllByText(/Go to Dashboard/i);
-      expect(buttons.length).toBeGreaterThan(0);
-    });
+    const buttons = await screen.findAllByText(/Go to Dashboard/i);
+    expect(buttons.length).toBeGreaterThan(0);
   });
 
   it("cleans up auth subscription on unmount", async () => {
     const { unmount } = render(<Page />);
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Simple, Secure, and Smart Banking/i),
-      ).toBeInTheDocument();
-    });
+    await screen.findByText(/Simple, Secure, and Smart Banking/i);
     unmount();
     expect(mockUnsubscribe).toHaveBeenCalled();
   });
