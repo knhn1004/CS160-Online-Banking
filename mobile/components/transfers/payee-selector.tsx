@@ -35,7 +35,7 @@ export function PayeeSelector({
   label = "Select Payee",
   error,
   disabled = false,
-  onRefreshPayees,
+  onRefreshPayees: _onRefreshPayees,
 }: PayeeSelectorProps) {
   const { theme } = useTheme();
   const colors = Colors[theme];

@@ -16,7 +16,7 @@ jest.mock('expo-constants', () => ({
 jest.mock('react-native-webview', () => {
   const React = jest.requireActual('react');
   const { View } = jest.requireActual('react-native');
-  const MockWebView = React.forwardRef(({ source, onMessage, ...props }: any, ref: any) => {
+  const MockWebView = React.forwardRef(({ source: _source, onMessage: _onMessage, ...props }: any, ref: any) => {
     React.useImperativeHandle(ref, () => ({
       injectJavaScript: jest.fn(),
     }));
