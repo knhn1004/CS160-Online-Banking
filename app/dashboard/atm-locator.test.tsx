@@ -25,6 +25,17 @@ vi.mock("@vis.gl/react-google-maps", () => ({
   APIProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="api-provider">{children}</div>
   ),
+  MapControl: ({
+    children,
+    ...props
+  }: { children?: React.ReactNode } & Record<string, unknown>) => (
+    <div data-testid="map-control" {...props}>
+      {children}
+    </div>
+  ),
+  ControlPosition: {
+    RIGHT_TOP: "RIGHT_TOP",
+  },
 }));
 
 // Mock geolocation
