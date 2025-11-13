@@ -6,7 +6,6 @@ const nextConfig: NextConfig = {
     "@prisma/client",
     ".prisma/client",
     "@prisma/client/edge",
-    "@prisma/extension-accelerate",
   ],
 };
 
