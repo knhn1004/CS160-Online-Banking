@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { SignupSchema, USStateTerritorySchema } from "@/lib/schemas/user";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 // Get US states/territories from schema
 const US_STATES = USStateTerritorySchema.options;
 
