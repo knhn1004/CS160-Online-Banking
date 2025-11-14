@@ -51,12 +51,14 @@ export async function GET(request: Request) {
     });
 
     return json(200, {
-      accounts: Array.isArray(accounts) ? accounts.map((acc) => ({
-        id: acc.id,
-        account_number: acc.account_number,
-        balance: Number(acc.balance),
-        created_at: acc.created_at.toISOString(),
-      })) : [],
+      accounts: Array.isArray(accounts)
+        ? accounts.map((acc) => ({
+            id: acc.id,
+            account_number: acc.account_number,
+            balance: Number(acc.balance),
+            created_at: acc.created_at.toISOString(),
+          }))
+        : [],
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
