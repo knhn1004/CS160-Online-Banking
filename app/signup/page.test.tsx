@@ -1,19 +1,25 @@
 import { render, screen } from "@testing-library/react";
+import { vi, beforeEach, describe, it, expect } from "vitest";
 import SignupPage from "./page";
 
 vi.mock("@/utils/supabase/client", () => ({
   createClient: () => ({
     auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
       getUser: () =>
         Promise.resolve({
           data: { user: null },
           error: null,
         }),
+      onAuthStateChange: vi
+        .fn()
+        .mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
       signUp: () =>
         Promise.resolve({
           data: { user: { id: "test-user-id" } },
           error: null,
         }),
+      resend: vi.fn().mockResolvedValue({ error: null }),
     },
   }),
 }));

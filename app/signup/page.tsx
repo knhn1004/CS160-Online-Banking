@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "@tanstack/react-form";
 import { createClient } from "@/utils/supabase/client";
@@ -16,8 +16,97 @@ export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [preparedEmail, setPreparedEmail] = useState<string | null>(null);
+  const supabase = useMemo(() => createClient(), []);
 
-  // Redirect if already authenticated
+  // Normalize US phone to E.164 for your zod /^\+\d{10,15}$/
+  function toE164US(input?: string) {
+    if (!input) return "";
+    const d = input.replace(/\D/g, "");
+    if (d.length === 10) return `+1${d}`;
+    if (d.length === 11 && d.startsWith("1")) return `+${d}`;
+    return ""; // return empty if invalid (or throw if you prefer)
+  }
+
+  async function tryAutoOnboard() {
+    // 1) must have a Supabase session
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const profRes = await fetch("/api/user/profile", {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: "no-store",
+    });
+
+    if (profRes.ok) {
+      const data = (await profRes.json()) as { user?: unknown };
+      const user = data.user;
+    } else {
+      // If you see 404, then onboarding was incomplete OR cache needs invalidation.
+    }
+
+    // 2) if profile already exists, bail (prevents dupes)
+    const exists = await fetch("/api/user/profile/me", { cache: "no-store" });
+    if (exists.ok) return;
+
+    // 3) pull the saved draft
+    const raw = localStorage.getItem("pendingOnboard");
+    if (!raw) return;
+    const draft = JSON.parse(raw);
+
+    // 4) build payload that matches your OnboardSchema
+    const payload = {
+      username: draft.username,
+      first_name: draft.firstName,
+      last_name: draft.lastName,
+      email: draft.email,
+      phone_number: toE164US(draft.phoneNumber), // MUST match /^\+\d{10,15}$/
+      street_address: draft.streetAddress,
+      address_line_2: draft.addressLine2 ?? null,
+      city: draft.city,
+      state_or_territory: draft.stateOrTerritory, // must be one of your Prisma enum values
+      postal_code: draft.postalCode, // /^\d{5}(-\d{4})?$/
+      country: draft.country ?? "USA",
+      role: draft.role ?? "customer", // must be in RoleEnum
+    };
+
+    // 5) call onboard WITH the Bearer token
+    const resp = await fetch("/api/user/onboard", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`, // <-- REQUIRED by your route
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (resp.ok) {
+      localStorage.removeItem("pendingOnboard");
+      window.location.assign("/dashboard");
+    } else {
+      console.warn("Auto-onboard failed:", await resp.text());
+    }
+  }
+
+  // Run once on mount, and again when the auth state flips to SIGNED_IN
+  useEffect(() => {
+    void tryAutoOnboard();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) void tryAutoOnboard();
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
+  // Redirect user if already authenticated:
   useEffect(() => {
     const checkAuth = async () => {
       const supabase = createClient();
@@ -31,6 +120,7 @@ export default function SignupPage() {
     checkAuth();
   }, [router]);
 
+  // User signup form fields:
   const form = useForm({
     defaultValues: {
       username: "",
@@ -103,66 +193,82 @@ export default function SignupPage() {
         | "MP",
       postalCode: "",
     },
+
+    // When the user submits their form...
     onSubmit: async ({ value }) => {
-      // Validate with Zod
-      const result = SignupSchema.safeParse(value);
-      if (!result.success) {
-        const firstError = result.error.issues[0];
-        setError(firstError?.message || "Validation failed");
-        return;
-      }
+      console.log("[signup] submit start", value); // For debugging in dev tools.
 
       setLoading(true);
       setError(null);
+      setInfo(null);
 
       try {
-        const supabase = createClient();
+        // 1) Validate user input first:
+        const prepared = {
+          ...value,
+          email: value.email.trim().toLowerCase(), // CASE-INSENSITIVE!!!
+        };
 
-        // Create auth user with Supabase
-        const { error: authError } = await supabase.auth.signUp({
-          email: value.email,
-          password: value.password,
+        setPreparedEmail(prepared.email);
+
+        const result = SignupSchema.safeParse(prepared);
+        if (!result.success) {
+          const firstError = result.error.issues[0];
+          throw new Error(firstError?.message || "Validation failed");
+        }
+
+        const profileToPersist = {
+          username: prepared.username,
+          firstName: prepared.firstName,
+          lastName: prepared.lastName,
+          email: prepared.email,
+          phoneNumber: prepared.phoneNumber,
+          streetAddress: prepared.streetAddress,
+          addressLine2: prepared.addressLine2 || null,
+          city: prepared.city,
+          stateOrTerritory: prepared.stateOrTerritory,
+          postalCode: prepared.postalCode,
+          country: "USA",
+          role: "customer", // This signup page is for customers ONLY, not for bank staff.
+        };
+
+        // Persist form data so we can finish onboarding after email confirmation (sensitive information is omitted):
+        localStorage.setItem(
+          "pendingOnboard",
+          JSON.stringify(profileToPersist),
+        );
+
+        // 2) Sign up only — onboarding is NOT complete yet.
+        console.log("[signup] calling supabase.auth.signUp"); // Debugging for dev tools.
+        const { data, error } = await supabase.auth.signUp({
+          email: prepared.email,
+          password: prepared.password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
         });
+        console.log("[signup] result", { data, error }); // Debugging for dev tools.
 
-        if (authError) {
-          console.log(authError.message);
-          setError(authError.message);
+        if (error) {
+          // Supabase typically returns 'User already registered' (message varies)
+          if (/already/i.test(error.message)) {
+            setInfo(
+              "This email is already registered. Check your inbox for the confirmation link or resend it.",
+            );
+            // Optional: show a "Resend confirmation" button
+          } else {
+            setError(error.message);
+          }
           return;
         }
 
-        // POST user to database
-        // Strip non-digit characters from phone number before sending
-        const cleanPhoneNumber = value.phoneNumber.replace(/\D/g, "");
-        const response = await fetch("/api/users/onboard", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username: value.username,
-            first_name: value.firstName,
-            last_name: value.lastName,
-            email: value.email,
-            phone_number: `+1${cleanPhoneNumber}`,
-            street_address: value.streetAddress,
-            address_line_2: value.addressLine2 || null,
-            city: value.city,
-            state_or_territory: value.stateOrTerritory,
-            postal_code: value.postalCode,
-            country: "USA",
-            role: "customer",
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = (await response.json()) as { message?: string };
-          throw new Error(errorData.message || "Failed to create user profile");
-        }
-
-        // Redirect on success
-        window.location.assign("/dashboard");
-      } catch (error) {
-        setError(error instanceof Error ? error.message : "An error occurred");
+        // 3) Notify the user to confirm email; onboarding will complete after authentication.
+        console.log("[signup] signUp ok");
+        setInfo(
+          "Check your email for a confirmation link to complete the onboarding process.",
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Signup failed.");
       } finally {
         setLoading(false);
       }
@@ -179,6 +285,7 @@ export default function SignupPage() {
         }}
         className="w-full max-w-sm space-y-4"
       >
+        {/* --- your existing fields unchanged below --- */}
         <form.Field
           name="username"
           validators={{
@@ -196,7 +303,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="username" className="text-sm font-medium">
-                Username
+                Username{" "}
                 <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
@@ -216,6 +323,7 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* Email */}
         <form.Field
           name="email"
           validators={{
@@ -233,8 +341,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="email" className="text-sm font-medium">
-                Email
-                <span className="text-destructive text-xs ml-1">*</span>
+                Email <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="email"
@@ -253,6 +360,7 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* Password */}
         <form.Field
           name="password"
           validators={{
@@ -279,7 +387,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="password" className="text-sm font-medium">
-                Password
+                Password{" "}
                 <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
@@ -299,23 +407,21 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* Confirm Password */}
         <form.Field
           name="confirmPassword"
           validators={{
             onChangeListenTo: ["password"],
             onChange: ({ value, fieldApi }) => {
               const password = fieldApi.form.getFieldValue("password");
-              if (value !== password) {
-                return "Passwords do not match";
-              }
-              return undefined;
+              return value !== password ? "Passwords do not match" : undefined;
             },
           }}
         >
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="confirmPassword" className="text-sm font-medium">
-                Confirm Password
+                Confirm Password{" "}
                 <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
@@ -335,6 +441,7 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* First Name */}
         <form.Field
           name="firstName"
           validators={{
@@ -352,7 +459,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="firstName" className="text-sm font-medium">
-                First Name
+                First Name{" "}
                 <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
@@ -372,6 +479,7 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* Last Name */}
         <form.Field
           name="lastName"
           validators={{
@@ -389,7 +497,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="lastName" className="text-sm font-medium">
-                Last Name
+                Last Name{" "}
                 <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
@@ -409,10 +517,12 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* Phone Number */}
         <form.Field
           name="phoneNumber"
           validators={{
             onChange: ({ value }) => {
+              // keep your loose client-side rule; real normalization happens later
               const result = z
                 .string()
                 .min(10, "Phone number must contain at least 10 digits")
@@ -427,7 +537,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="phoneNumber" className="text-sm font-medium">
-                Phone Number
+                Phone Number{" "}
                 <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
@@ -448,6 +558,7 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* Street Address */}
         <form.Field
           name="streetAddress"
           validators={{
@@ -465,7 +576,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="streetAddress" className="text-sm font-medium">
-                Street Address
+                Street Address{" "}
                 <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
@@ -485,11 +596,12 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* Address Line 2 */}
         <form.Field name="addressLine2">
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="addressLine2" className="text-sm font-medium">
-                Address Line 2
+                Address Line 2{" "}
                 <span className="text-gray-500 text-xs ml-1">(optional)</span>
               </label>
               <Input
@@ -503,6 +615,7 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* City */}
         <form.Field
           name="city"
           validators={{
@@ -520,8 +633,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="city" className="text-sm font-medium">
-                City
-                <span className="text-destructive text-xs ml-1">*</span>
+                City <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="city"
@@ -540,21 +652,18 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* State/Territory */}
         <form.Field
           name="stateOrTerritory"
           validators={{
-            onChange: ({ value }) => {
-              if (!value) {
-                return "State/Territory is required";
-              }
-              return undefined;
-            },
+            onChange: ({ value }) =>
+              !value ? "State/Territory is required" : undefined,
           }}
         >
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="stateOrTerritory" className="text-sm font-medium">
-                State/Territory
+                State/Territory{" "}
                 <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <select
@@ -583,6 +692,7 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* Postal Code */}
         <form.Field
           name="postalCode"
           validators={{
@@ -590,7 +700,7 @@ export default function SignupPage() {
               const result = z
                 .string()
                 .regex(
-                  /^\d{5}(-?\d{4})?$/,
+                  /^\d{5}(-\d{4})?$/,
                   "Postal code must be 5 digits or ZIP+4 format",
                 )
                 .safeParse(value);
@@ -603,7 +713,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="postalCode" className="text-sm font-medium">
-                Postal Code
+                Postal Code{" "}
                 <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
@@ -625,10 +735,41 @@ export default function SignupPage() {
           )}
         </form.Field>
 
+        {/* Messages */}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {info ? <p className="text-sm text-blue-600">{info}</p> : null}
+
+        {/* Submit */}
         <Button type="submit" disabled={loading} className="w-full">
           {loading ? "Signing up..." : "Sign up"}
         </Button>
+
+        {/* Resend Confirmation */}
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            className="mx-auto"
+            onClick={async () => {
+              if (!preparedEmail) {
+                setError("No email available to resend confirmation email to.");
+                return;
+              }
+              const { error } = await supabase.auth.resend({
+                type: "signup",
+                email: preparedEmail,
+              });
+              if (error) setError(error.message);
+              else
+                setInfo(
+                  "Confirmation email sent. Check your inbox (and spam).",
+                );
+            }}
+          >
+            Resend confirmation email
+          </Button>
+        </div>
+
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <a href="/login" className="text-primary hover:underline font-medium">
