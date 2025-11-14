@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "@tanstack/react-form";
 import { createClient } from "@/utils/supabase/client";
@@ -29,7 +29,7 @@ export default function SignupPage() {
     return ""; // return empty if invalid (or throw if you prefer)
   }
 
-  async function tryAutoOnboard() {
+  const tryAutoOnboard = useCallback(async () => {
     // 1) must have a Supabase session
     const {
       data: { session },
@@ -44,8 +44,7 @@ export default function SignupPage() {
     });
 
     if (profRes.ok) {
-      const data = (await profRes.json()) as { user?: unknown };
-      const user = data.user;
+      const { user: _user } = (await profRes.json()) as { user?: unknown };
     } else {
       // If you see 404, then onboarding was incomplete OR cache needs invalidation.
     }
@@ -91,7 +90,7 @@ export default function SignupPage() {
     } else {
       console.warn("Auto-onboard failed:", await resp.text());
     }
-  }
+  }, [supabase]);
 
   // Run once on mount, and again when the auth state flips to SIGNED_IN
   useEffect(() => {
@@ -100,11 +99,13 @@ export default function SignupPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session) void tryAutoOnboard();
+      if (event === "SIGNED_IN" && session) {
+        void tryAutoOnboard();
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, [tryAutoOnboard, router]);
 
   // Redirect user if already authenticated:
   useEffect(() => {
