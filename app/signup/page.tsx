@@ -105,7 +105,7 @@ export default function SignupPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, [tryAutoOnboard, router]);
+  }, [tryAutoOnboard, router, supabase]);
 
   // Redirect user if already authenticated:
   useEffect(() => {
