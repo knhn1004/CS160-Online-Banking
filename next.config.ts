@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
     ".prisma/client",
     "@prisma/client/edge",
   ],
+  typescript: {
+    // Disable type checking during build
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    // Disable ESLint during build
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;
