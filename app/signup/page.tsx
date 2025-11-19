@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SignupSchema, USStateTerritorySchema } from "@/lib/schemas/user";
 import { z } from "zod";
+import type { USStateTerritory } from "@/lib/schemas/user";
 
-const US_STATES = USStateTerritorySchema.options;
+const US_STATES = USStateTerritorySchema.options as readonly USStateTerritory[];
 
 type SupabaseSession = { access_token: string } | null;
 type SupabaseUser = { id: string; email?: string } | null;
@@ -327,6 +328,12 @@ export default function SignupPage() {
           | undefined;
         if (!mounted || !draft) return;
 
+        const rawState = String(draft["stateOrTerritory"] ?? "");
+        const stateOrTerritory =
+          rawState === "" || US_STATES.includes(rawState as USStateTerritory)
+            ? (rawState as "" | USStateTerritory)
+            : "";
+
         form.reset({
           username: String(draft["username"] ?? ""),
           email: String(draft["email"] ?? ""),
@@ -338,7 +345,7 @@ export default function SignupPage() {
           streetAddress: String(draft["streetAddress"] ?? ""),
           addressLine2: String(draft["addressLine2"] ?? ""),
           city: String(draft["city"] ?? ""),
-          stateOrTerritory: String(draft["stateOrTerritory"] ?? ""),
+          stateOrTerritory: stateOrTerritory,
           postalCode: String(draft["postalCode"] ?? ""),
         });
       } catch {
