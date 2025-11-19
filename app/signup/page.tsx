@@ -1,129 +1,176 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "@tanstack/react-form";
-import { createClient } from "@/utils/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SignupSchema, USStateTerritorySchema } from "@/lib/schemas/user";
 import { z } from "zod";
 
-export const dynamic = "force-dynamic";
-
-// Get US states/territories from schema
 const US_STATES = USStateTerritorySchema.options;
+
+type SupabaseSession = { access_token: string } | null;
+type SupabaseUser = { id: string; email?: string } | null;
+
+type SupabaseAuthLike = {
+  getSession: () => Promise<{ data: { session: SupabaseSession } }>;
+  getUser: () => Promise<{ data?: { user?: SupabaseUser } }>;
+  onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
+    data: { subscription: { unsubscribe: () => void } };
+  };
+  signUp?: (
+    opts: unknown,
+  ) => Promise<{ data?: unknown; error?: { message?: string } | null }>;
+  resend?: (opts: unknown) => Promise<{ error?: { message?: string } | null }>;
+  updateUser?: (opts: unknown) => Promise<unknown>;
+};
+
+type SupabaseClientLike = {
+  auth: SupabaseAuthLike;
+};
 
 export default function SignupPage() {
   const router = useRouter();
+
+  const [supabase, setSupabase] = useState<SupabaseClientLike | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [preparedEmail, setPreparedEmail] = useState<string | null>(null);
-  const supabase = useMemo(() => createClient(), []);
 
-  // Normalize US phone to E.164 for your zod /^\+\d{10,15}$/
+  function isPromise<T = unknown>(v: unknown): v is Promise<T> {
+    return !!v && typeof (v as { then?: unknown }).then === "function";
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import("@/utils/supabase/client");
+        if (!mounted) return;
+        // createClient might return a client or a Promise<client>; handle both
+        const maybe = mod.createClient();
+        const client = isPromise(maybe) ? await maybe : (maybe as unknown);
+        setSupabase(client as SupabaseClientLike);
+      } catch (err) {
+        // keep UI alive; show optional message in console
+
+        console.error("Failed to load supabase client:", err);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   function toE164US(input?: string) {
     if (!input) return "";
     const d = input.replace(/\D/g, "");
     if (d.length === 10) return `+1${d}`;
     if (d.length === 11 && d.startsWith("1")) return `+${d}`;
-    return ""; // return empty if invalid (or throw if you prefer)
+    return "";
   }
 
-  const tryAutoOnboard = useCallback(async () => {
-    // 1) must have a Supabase session
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) return;
+  const tryAutoOnboard = useCallback(async (): Promise<void> => {
+    if (!supabase) return;
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) return;
 
-    const profRes = await fetch("/api/user/profile", {
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      cache: "no-store",
-    });
+      // If profile already exists, nothing to do
+      const exists = await fetch("/api/user/profile/me", { cache: "no-store" });
+      if (exists.ok) return;
 
-    if (profRes.ok) {
-      const { user: _user } = (await profRes.json()) as { user?: unknown };
-    } else {
-      // If you see 404, then onboarding was incomplete OR cache needs invalidation.
+      // read draft from user metadata
+      const { data: userData } = await supabase.auth.getUser();
+      const userMeta = (
+        userData?.user as { user_metadata?: unknown } | undefined
+      )?.user_metadata as { profileDraft?: unknown } | undefined;
+      const draft = userMeta?.profileDraft as
+        | Record<string, unknown>
+        | undefined;
+      if (!draft) return;
+
+      const payload = {
+        username: String(draft["username"] ?? ""),
+        first_name: String(draft["firstName"] ?? ""),
+        last_name: String(draft["lastName"] ?? ""),
+        email: String(draft["email"] ?? ""),
+        phone_number: toE164US(String(draft["phoneNumber"] ?? "")),
+        street_address: String(draft["streetAddress"] ?? ""),
+        address_line_2:
+          draft["addressLine2"] == null ? null : String(draft["addressLine2"]),
+        city: String(draft["city"] ?? ""),
+        state_or_territory: String(draft["stateOrTerritory"] ?? ""),
+        postal_code: String(draft["postalCode"] ?? ""),
+        country: String(draft["country"] ?? "USA"),
+        role: String(draft["role"] ?? "customer"),
+      };
+
+      const resp = await fetch("/api/user/onboard", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (resp.ok) {
+        try {
+          await supabase.auth.updateUser?.({ data: { profileDraft: null } });
+        } catch {
+          // ignore
+        }
+        router.push("/dashboard");
+      } else {
+        console.warn("Auto-onboard failed:", await resp.text());
+      }
+    } catch (caught) {
+      console.error("tryAutoOnboard error:", caught);
     }
+  }, [supabase, router]);
 
-    // 2) if profile already exists, bail (prevents dupes)
-    const exists = await fetch("/api/user/profile/me", { cache: "no-store" });
-    if (exists.ok) return;
-
-    // 3) pull the saved draft
-    const raw = localStorage.getItem("pendingOnboard");
-    if (!raw) return;
-    const draft = JSON.parse(raw);
-
-    // 4) build payload that matches your OnboardSchema
-    const payload = {
-      username: draft.username,
-      first_name: draft.firstName,
-      last_name: draft.lastName,
-      email: draft.email,
-      phone_number: toE164US(draft.phoneNumber), // MUST match /^\+\d{10,15}$/
-      street_address: draft.streetAddress,
-      address_line_2: draft.addressLine2 ?? null,
-      city: draft.city,
-      state_or_territory: draft.stateOrTerritory, // must be one of your Prisma enum values
-      postal_code: draft.postalCode, // /^\d{5}(-\d{4})?$/
-      country: draft.country ?? "USA",
-      role: draft.role ?? "customer", // must be in RoleEnum
-    };
-
-    // 5) call onboard WITH the Bearer token
-    const resp = await fetch("/api/user/onboard", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`, // <-- REQUIRED by your route
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (resp.ok) {
-      localStorage.removeItem("pendingOnboard");
-      window.location.assign("/dashboard");
-    } else {
-      console.warn("Auto-onboard failed:", await resp.text());
-    }
-  }, [supabase]);
-
-  // Run once on mount, and again when the auth state flips to SIGNED_IN
+  // subscribe to auth state and trigger auto-onboard on SIGNED_IN
   useEffect(() => {
+    if (!supabase) return;
     void tryAutoOnboard();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((event: string, session: unknown) => {
       if (event === "SIGNED_IN" && session) {
         void tryAutoOnboard();
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [tryAutoOnboard, router, supabase]);
-
-  // Redirect user if already authenticated:
-  useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        router.push("/dashboard");
+    return () => {
+      try {
+        subscription.unsubscribe();
+      } catch {
+        // ignore
       }
     };
-    checkAuth();
-  }, [router]);
+  }, [supabase, tryAutoOnboard]);
 
-  // User signup form fields:
+  // redirect client-side if already signed in
+  useEffect(() => {
+    if (!supabase) return;
+    (async () => {
+      try {
+        const { data: userPayload } = await supabase.auth.getUser();
+        const user = (userPayload as { user?: unknown } | undefined)?.user;
+        if (user) router.push("/dashboard");
+      } catch {
+        // ignore
+      }
+    })();
+  }, [supabase, router]);
+
   const form = useForm({
     defaultValues: {
       username: "",
@@ -197,27 +244,20 @@ export default function SignupPage() {
       postalCode: "",
     },
 
-    // When the user submits their form...
     onSubmit: async ({ value }) => {
-      console.log("[signup] submit start", value); // For debugging in dev tools.
-
       setLoading(true);
       setError(null);
       setInfo(null);
 
       try {
-        // 1) Validate user input first:
-        const prepared = {
-          ...value,
-          email: value.email.trim().toLowerCase(), // CASE-INSENSITIVE!!!
-        };
-
+        const prepared = { ...value, email: value.email.trim().toLowerCase() };
         setPreparedEmail(prepared.email);
 
         const result = SignupSchema.safeParse(prepared);
         if (!result.success) {
-          const firstError = result.error.issues[0];
-          throw new Error(firstError?.message || "Validation failed");
+          throw new Error(
+            result.error.issues[0]?.message ?? "Validation failed",
+          );
         }
 
         const profileToPersist = {
@@ -232,41 +272,36 @@ export default function SignupPage() {
           stateOrTerritory: prepared.stateOrTerritory,
           postalCode: prepared.postalCode,
           country: "USA",
-          role: "customer", // This signup page is for customers ONLY, not for bank staff.
+          role: "customer",
         };
 
-        // Persist form data so we can finish onboarding after email confirmation (sensitive information is omitted):
-        localStorage.setItem(
-          "pendingOnboard",
-          JSON.stringify(profileToPersist),
-        );
+        if (!supabase) {
+          throw new Error("Authentication client not ready.");
+        }
 
-        // 2) Sign up only — onboarding is NOT complete yet.
-        console.log("[signup] calling supabase.auth.signUp"); // Debugging for dev tools.
-        const { data, error } = await supabase.auth.signUp({
+        // store draft in auth user_metadata via signUp options (no localStorage)
+        const signupResult = await supabase.auth.signUp?.({
           email: prepared.email,
           password: prepared.password,
           options: {
             emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: { profileDraft: profileToPersist },
           },
         });
-        console.log("[signup] result", { data, error }); // Debugging for dev tools.
 
-        if (error) {
-          // Supabase typically returns 'User already registered' (message varies)
-          if (/already/i.test(error.message)) {
+        const signupError = signupResult?.error ?? null;
+
+        if (signupError) {
+          if (/already/i.test(signupError.message ?? "")) {
             setInfo(
               "This email is already registered. Check your inbox for the confirmation link or resend it.",
             );
-            // Optional: show a "Resend confirmation" button
           } else {
-            setError(error.message);
+            throw new Error(signupError.message ?? "Signup failed");
           }
           return;
         }
 
-        // 3) Notify the user to confirm email; onboarding will complete after authentication.
-        console.log("[signup] signUp ok");
         setInfo(
           "Check your email for a confirmation link to complete the onboarding process.",
         );
@@ -278,6 +313,43 @@ export default function SignupPage() {
     },
   });
 
+  // restore draft from user_metadata if present (populate form fields)
+  useEffect(() => {
+    if (!supabase) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const userMeta = (data?.user as { user_metadata?: unknown } | undefined)
+          ?.user_metadata as { profileDraft?: unknown } | undefined;
+        const draft = userMeta?.profileDraft as
+          | Record<string, unknown>
+          | undefined;
+        if (!mounted || !draft) return;
+
+        form.reset({
+          username: String(draft["username"] ?? ""),
+          email: String(draft["email"] ?? ""),
+          password: "",
+          confirmPassword: "",
+          firstName: String(draft["firstName"] ?? ""),
+          lastName: String(draft["lastName"] ?? ""),
+          phoneNumber: String(draft["phoneNumber"] ?? ""),
+          streetAddress: String(draft["streetAddress"] ?? ""),
+          addressLine2: String(draft["addressLine2"] ?? ""),
+          city: String(draft["city"] ?? ""),
+          stateOrTerritory: String(draft["stateOrTerritory"] ?? ""),
+          postalCode: String(draft["postalCode"] ?? ""),
+        });
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [supabase, form]);
+
   return (
     <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
       <form
@@ -288,7 +360,7 @@ export default function SignupPage() {
         }}
         className="w-full max-w-sm space-y-4"
       >
-        {/* --- your existing fields unchanged below --- */}
+        {/* Username */}
         <form.Field
           name="username"
           validators={{
@@ -462,7 +534,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="firstName" className="text-sm font-medium">
-                First Name{" "}
+                First name{" "}
                 <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
@@ -500,7 +572,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="lastName" className="text-sm font-medium">
-                Last Name{" "}
+                Last name{" "}
                 <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
@@ -520,28 +592,22 @@ export default function SignupPage() {
           )}
         </form.Field>
 
-        {/* Phone Number */}
+        {/* Phone */}
         <form.Field
           name="phoneNumber"
           validators={{
             onChange: ({ value }) => {
-              // keep your loose client-side rule; real normalization happens later
-              const result = z
-                .string()
-                .min(10, "Phone number must contain at least 10 digits")
-                .regex(/\d/, "Phone number must contain digits")
-                .safeParse(value);
-              return result.success
+              const digits = (value ?? "").replace(/\D/g, "");
+              return digits.length >= 10
                 ? undefined
-                : result.error.issues[0]?.message;
+                : "Enter a valid phone number";
             },
           }}
         >
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="phoneNumber" className="text-sm font-medium">
-                Phone Number{" "}
-                <span className="text-destructive text-xs ml-1">*</span>
+                Phone
               </label>
               <Input
                 id="phoneNumber"
@@ -549,7 +615,6 @@ export default function SignupPage() {
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
-                required
                 placeholder="(555) 123-4567 or 555-123-4567"
               />
               {field.state.meta.errors.length > 0 && (
@@ -579,8 +644,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="streetAddress" className="text-sm font-medium">
-                Street Address{" "}
-                <span className="text-destructive text-xs ml-1">*</span>
+                Street address
               </label>
               <Input
                 id="streetAddress"
@@ -588,7 +652,6 @@ export default function SignupPage() {
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
-                required
               />
               {field.state.meta.errors.length > 0 && (
                 <p className="text-sm text-destructive">
@@ -604,7 +667,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="addressLine2" className="text-sm font-medium">
-                Address Line 2{" "}
+                Address line 2{" "}
                 <span className="text-gray-500 text-xs ml-1">(optional)</span>
               </label>
               <Input
@@ -636,7 +699,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="city" className="text-sm font-medium">
-                City <span className="text-destructive text-xs ml-1">*</span>
+                City
               </label>
               <Input
                 id="city"
@@ -644,7 +707,6 @@ export default function SignupPage() {
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
-                required
               />
               {field.state.meta.errors.length > 0 && (
                 <p className="text-sm text-destructive">
@@ -655,19 +717,20 @@ export default function SignupPage() {
           )}
         </form.Field>
 
-        {/* State/Territory */}
+        {/* State / Territory */}
         <form.Field
           name="stateOrTerritory"
           validators={{
-            onChange: ({ value }) =>
-              !value ? "State/Territory is required" : undefined,
+            onChange: ({ value }) => {
+              if (!value) return "State/Territory is required";
+              return undefined;
+            },
           }}
         >
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="stateOrTerritory" className="text-sm font-medium">
-                State/Territory{" "}
-                <span className="text-destructive text-xs ml-1">*</span>
+                State/Territory
               </label>
               <select
                 id="stateOrTerritory"
@@ -677,12 +740,12 @@ export default function SignupPage() {
                   field.handleChange(e.target.value as typeof field.state.value)
                 }
                 required
-                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-md border px-3 py-2"
               >
-                <option value="">Select State/Territory</option>
-                {US_STATES.map((state) => (
-                  <option key={state} value={state}>
-                    {state}
+                <option value="">Select a state</option>
+                {US_STATES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
                   </option>
                 ))}
               </select>
@@ -703,10 +766,10 @@ export default function SignupPage() {
               const result = z
                 .string()
                 .regex(
-                  /^\d{5}(-\d{4})?$/,
+                  /^\d{5}(-?\d{4})?$/,
                   "Postal code must be 5 digits or ZIP+4 format",
                 )
-                .safeParse(value);
+                .safeParse(value || "");
               return result.success
                 ? undefined
                 : result.error.issues[0]?.message;
@@ -716,8 +779,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="postalCode" className="text-sm font-medium">
-                Postal Code{" "}
-                <span className="text-destructive text-xs ml-1">*</span>
+                Postal code
               </label>
               <Input
                 id="postalCode"
@@ -738,35 +800,53 @@ export default function SignupPage() {
           )}
         </form.Field>
 
-        {/* Messages */}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {info ? <p className="text-sm text-blue-600">{info}</p> : null}
+        {info ? (
+          <p className="text-sm text-blue-600 text-center">{info}</p>
+        ) : null}
 
-        {/* Submit */}
         <Button type="submit" disabled={loading} className="w-full">
           {loading ? "Signing up..." : "Sign up"}
         </Button>
 
-        {/* Resend Confirmation */}
-        <div className="flex justify-center">
+        <div className="flex justify-center mt-3">
           <Button
             type="button"
             variant="outline"
             className="mx-auto"
             onClick={async () => {
+              setError(null);
+              setInfo(null);
               if (!preparedEmail) {
                 setError("No email available to resend confirmation email to.");
                 return;
               }
-              const { error } = await supabase.auth.resend({
-                type: "signup",
-                email: preparedEmail,
-              });
-              if (error) setError(error.message);
-              else
-                setInfo(
-                  "Confirmation email sent. Check your inbox (and spam).",
+              if (!supabase) {
+                setError(
+                  "Authentication is not available yet. Try again in a moment.",
                 );
+                return;
+              }
+              try {
+                const { error: resendError } = (await supabase.auth.resend?.({
+                  type: "signup",
+                  email: preparedEmail,
+                })) ?? { error: null };
+                if (resendError)
+                  setError(
+                    resendError.message ?? "Failed to resend confirmation.",
+                  );
+                else
+                  setInfo(
+                    "Confirmation email sent. Check your inbox (and spam).",
+                  );
+              } catch (resendErr) {
+                setError(
+                  resendErr instanceof Error
+                    ? resendErr.message
+                    : "Failed to resend confirmation.",
+                );
+              }
             }}
           >
             Resend confirmation email
