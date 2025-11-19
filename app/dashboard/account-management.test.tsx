@@ -28,7 +28,7 @@ describe("AccountManagement", () => {
         account_number: "12345678901234567",
         routing_number: "724722907",
         account_type: "checking" as const,
-        balance: 10000, // $100.00 in cents
+        balance: 10000,
         is_active: true,
         created_at: "2024-01-01T00:00:00.000Z",
       },
@@ -37,7 +37,7 @@ describe("AccountManagement", () => {
         account_number: "98765432109876543",
         routing_number: "724722907",
         account_type: "savings" as const,
-        balance: 50000, // $500.00 in cents
+        balance: 50000,
         is_active: true,
         created_at: "2024-01-02T00:00:00.000Z",
       },
@@ -78,8 +78,8 @@ describe("AccountManagement", () => {
     });
 
     expect(screen.getByText(/Savings Account/)).toBeInTheDocument();
-    expect(screen.getByText("$100.00")).toBeInTheDocument();
-    expect(screen.getByText("$500.00")).toBeInTheDocument();
+    expect(screen.getByText("$10,000.00")).toBeInTheDocument();
+    expect(screen.getByText("$50,000.00")).toBeInTheDocument();
     expect(screen.getByText("12345678901234567")).toBeInTheDocument();
     // Multiple accounts have same routing number, so check first one
     const routingNumbers = screen.getAllByText("724722907");
