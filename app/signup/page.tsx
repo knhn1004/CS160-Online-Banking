@@ -614,7 +614,7 @@ export default function SignupPage() {
           {(field) => (
             <div className="space-y-1">
               <label htmlFor="phoneNumber" className="text-sm font-medium">
-                Phone
+                Phone number
               </label>
               <Input
                 id="phoneNumber"
