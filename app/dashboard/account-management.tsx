@@ -66,7 +66,7 @@ export function AccountManagement() {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-    }).format(amount / 100);
+    }).format(amount);
   };
 
   const copyToClipboard = async (text: string, field: string) => {
