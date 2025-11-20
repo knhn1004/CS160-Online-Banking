@@ -1,47 +1,88 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { finalizeOnboardFromSupabaseUser } from "@/app/lib/onboard";
+
+type AuthExchangeResult = {
+  data?: { session?: unknown; user?: unknown } | null;
+  error?: { message?: string } | null;
+};
+
+type AuthClient = {
+  exchangeCodeForSession?: (
+    arg: Request | string | { code: string },
+  ) => Promise<AuthExchangeResult>;
+  getSessionFromUrl?: () => Promise<AuthExchangeResult>;
+};
 
 export async function GET(req: NextRequest) {
-  console.log("[auth/callback] hit:", req.url);
   const url = new URL(req.url);
-  const code = url.searchParams.get("code");
   const error = url.searchParams.get("error");
-  const supabase = await createClient();
-
-  //   return NextResponse.json({ ok: true, exchange: res ?? null });
-  // }
 
   if (error) {
     return NextResponse.redirect(
-      new URL(`/auth/error?error=${encodeURIComponent(error)}`, url.origin),
-    );
-  }
-  if (!code) {
-    return NextResponse.redirect(new URL("/", url.origin));
-  }
-
-  // const res = await (supabase.auth as any).exchangeCodeForSession?.(code).catch((e: any) => ({ error: e }));
-  // console.log("[auth/callback] exchange result:", res);
-
-  // This sets HttpOnly cookies on the response
-  const { error: exchangeError } =
-    await supabase.auth.exchangeCodeForSession(code);
-  if (exchangeError) {
-    return NextResponse.redirect(
-      new URL(
-        `/auth/error?error=${encodeURIComponent(exchangeError.message ?? "exchange_failed")}`,
-        url.origin,
-      ),
+      new URL(`/signup?error=callback`, url.origin),
+      303,
     );
   }
 
-  // Optional: best-effort finalize (don’t block redirect if it fails).
-  // Note: this same-request fetch won’t include the new cookie yet; that’s fine.
+  // createServerClient wrapper from utils/supabase/server.ts
+  const supabase = await createClient();
+
+  // Try helper that accepts the Request (supported by @supabase/ssr createServerClient)
+  // Fallback to SDK shapes if helper isn't present.
+  const auth = supabase.auth as unknown as AuthClient;
+  let exchangeResult: AuthExchangeResult | undefined;
   try {
-    await fetch(new URL("/api/user/onboard", url.origin), { method: "POST" });
-  } catch {
-    // ignore; client page or dashboard can also trigger finalize
+    if (typeof auth.exchangeCodeForSession === "function") {
+      // many server helpers accept the Request directly and will set cookies via the cookie handler
+      try {
+        exchangeResult = await auth.exchangeCodeForSession(req);
+      } catch {
+        // fallback: try string/object variants if the SDK requires code only
+        const code = url.searchParams.get("code");
+        if (!code) throw new Error("missing_code");
+        try {
+          exchangeResult = await auth.exchangeCodeForSession(code);
+        } catch {
+          exchangeResult = await auth.exchangeCodeForSession?.({ code });
+        }
+      }
+    } else if (typeof auth.getSessionFromUrl === "function") {
+      exchangeResult = await auth.getSessionFromUrl();
+    } else {
+      throw new Error("no_exchange_method");
+    }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.redirect(
+      new URL(`/signup?error=${encodeURIComponent(msg)}`, url.origin),
+      303,
+    );
   }
 
-  return NextResponse.redirect(new URL("/auth/complete", url.origin));
+  if (exchangeResult?.error) {
+    const msg = exchangeResult.error?.message ?? "exchange_failed";
+    return NextResponse.redirect(
+      new URL(`/signup?error=${encodeURIComponent(msg)}`, url.origin),
+      303,
+    );
+  }
+
+  // Server-finalize onboarding using the same server supabase client (avoids cookie forwarding)
+  try {
+    await finalizeOnboardFromSupabaseUser(supabase);
+  } catch (e) {
+    console.error("[auth/callback] finalizeOnboard error:", e);
+    // don't block user's redirect
+  }
+
+  // Return redirect. createServerClient should have written Set-Cookie into Next's cookie store
+  const requestedRedirect = url.searchParams.get("redirectTo") ?? "";
+  const safeRedirect =
+    requestedRedirect && requestedRedirect.startsWith("/")
+      ? requestedRedirect
+      : "/dashboard";
+
+  return NextResponse.redirect(new URL(safeRedirect, url.origin), 303);
 }

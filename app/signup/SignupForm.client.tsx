@@ -131,7 +131,9 @@ export default function SignupForm({ initialDraft }: Props) {
           email: prepared.email,
           password: prepared.password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(
+              "/welcome",
+            )}`,
             data: { profileDraft: profileToPersist },
           },
         });
