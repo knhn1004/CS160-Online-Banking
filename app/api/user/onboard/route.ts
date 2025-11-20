@@ -185,6 +185,7 @@ export async function POST() {
   const country = String(p.country ?? "United States");
 
   // Insert into DB using Prisma (NOT Supabase). This needs to be idempotent.
+  // TO-DO: Change to upsert instead of createMany (think this is optional though).
   try {
     const result = await prisma.user.createMany({
       data: [
