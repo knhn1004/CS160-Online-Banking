@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
+import type { Session } from "@supabase/supabase-js";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +23,7 @@ type Profile = {
   email?: string | null;
 };
 
-export function UserMenu() {
+export default function UserMenu() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [initialized, setInitialized] = useState(false);
   const pathname = usePathname();
@@ -42,13 +44,15 @@ export function UserMenu() {
       setProfile({ email, name });
     };
 
-    supabase.auth.getUser().then(({ data }) => {
-      setFromUser(data.user ?? null);
-      setInitialized(true);
-    });
+    supabase.auth
+      .getUser()
+      .then((res: { data?: { user?: User | null } | null }) => {
+        setFromUser((res.data && res.data.user) ?? null);
+        setInitialized(true);
+      });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (_event: string, session: Session | null) => {
         setFromUser(session?.user ?? null);
       },
     );
