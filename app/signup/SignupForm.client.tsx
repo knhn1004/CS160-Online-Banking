@@ -135,6 +135,7 @@ export default function SignupForm({ initialDraft }: Props) {
             data: { profileDraft: profileToPersist },
           },
         });
+        console.debug("[signup] signupResult:", signupResult);
 
         const signupError = signupResult?.error ?? null;
 
