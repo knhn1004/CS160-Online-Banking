@@ -23,7 +23,7 @@ type Profile = {
   email?: string | null;
 };
 
-export default function UserMenu() {
+export function UserMenu() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [initialized, setInitialized] = useState(false);
   const pathname = usePathname();
@@ -110,3 +110,5 @@ export default function UserMenu() {
     </DropdownMenu>
   );
 }
+
+export default UserMenu;
