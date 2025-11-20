@@ -1,119 +1,237 @@
-import { z } from "zod";
+import { NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
 import { getPrisma } from "@/app/lib/prisma";
-import { getAuthUserFromRequest } from "@/lib/auth";
-import { RoleEnum, USStateTerritory } from "@prisma/client";
+import { z } from "zod";
 
-type AuthSuccess = { ok: true; supabaseUser: { id: string; email?: string } };
-type AuthFailure = { ok: false; status?: number; body?: unknown };
-type AuthResult = AuthSuccess | AuthFailure;
+const prisma = getPrisma();
 
-const OnboardSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  first_name: z.string().min(1, "First name is required"),
-  last_name: z.string().min(1, "Last name is required"),
-  email: z.string().email({ message: "Invalid email address" }),
-  phone_number: z
-    .string()
-    .regex(
-      /^\+\d{10,15}$/,
-      "Phone number must be in E.164 format (e.g. +11234567890)",
-    ),
-  street_address: z.string().min(1, "Street address is required"),
-  address_line_2: z.string().nullable().optional(),
-  city: z.string().min(1, "City is required"),
-  state_or_territory: z.enum(
-    Object.values(USStateTerritory) as unknown as [string, ...string[]],
-  ),
-  postal_code: z
-    .string()
-    .regex(/^\d{5}(-\d{4})?$/, "Postal code must be 5 digits or ZIP+4 format"),
-  country: z.string().min(1),
-  role: z.enum(Object.values(RoleEnum) as unknown as [string, ...string[]]),
+const US_STATE_CODES = [
+  "AL",
+  "AK",
+  "AZ",
+  "AR",
+  "CA",
+  "CO",
+  "CT",
+  "DE",
+  "DC",
+  "FL",
+  "GA",
+  "HI",
+  "ID",
+  "IL",
+  "IN",
+  "IA",
+  "KS",
+  "KY",
+  "LA",
+  "ME",
+  "MD",
+  "MA",
+  "MI",
+  "MN",
+  "MS",
+  "MO",
+  "MT",
+  "NE",
+  "NV",
+  "NH",
+  "NJ",
+  "NM",
+  "NY",
+  "NC",
+  "ND",
+  "OH",
+  "OK",
+  "OR",
+  "PA",
+  "RI",
+  "SC",
+  "SD",
+  "TN",
+  "TX",
+  "UT",
+  "VT",
+  "VA",
+  "WA",
+  "WV",
+  "WI",
+  "WY",
+  "PR",
+  "GU",
+  "VI",
+  "AS",
+  "MP",
+] as const;
+
+const ROLE_VALUES = ["customer", "bank_manager"] as const;
+
+// Thin validation for the draft (adjust to match SignupSchema):
+const ProfileDraftSchema = z.object({
+  username: z.string().min(3),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  email: z.string().email(),
+  phoneNumber: z.string().optional(),
+  streetAddress: z.string().optional(),
+  addressLine2: z.string().nullable().optional(),
+  city: z.string().min(1),
+  stateOrTerritory: z.enum([...US_STATE_CODES] as unknown as [
+    string,
+    ...string[],
+  ]),
+  postalCode: z.string().min(5),
+  country: z.string().optional(),
+  role: z.enum([...ROLE_VALUES] as [string, ...string[]]).optional(),
 });
 
-export async function POST(request: Request) {
-  try {
-    // parse body
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return new Response(JSON.stringify({ message: "Invalid JSON body" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+// Define a minimal supabase user shape we need (avoid `any`)
+type SupabaseUser = {
+  id: string;
+  user_metadata?: {
+    profileDraft?: unknown;
+  } | null;
+};
 
-    // validate payload
-    const result = OnboardSchema.safeParse(body);
-    if (!result.success) {
-      console.error("Onboard validation failed:", result.error.issues);
-      return new Response(
-        JSON.stringify({
-          message: "Validation failed",
-          issues: result.error.issues,
-        }),
-        { status: 422, headers: { "Content-Type": "application/json" } },
-      );
-    }
-    const safeData: z.infer<typeof OnboardSchema> = result.data;
-
-    // require auth token from client and resolve auth_user_id
-    const auth = (await getAuthUserFromRequest(request).catch(
-      () => null,
-    )) as AuthResult;
-    const authUserId = auth.ok ? auth.supabaseUser.id : undefined;
-
-    if (!authUserId) {
-      return new Response(
-        JSON.stringify({
-          message:
-            "Authentication required. Sign up/sign in on the client and include Authorization: Bearer <access_token> when POSTing to this endpoint.",
-        }),
-        { status: 401, headers: { "Content-Type": "application/json" } },
-      );
-    }
-
-    // create user row (auth_user_id is required by Prisma)
-    const prisma = getPrisma();
-    const user = await prisma.user.create({
-      data: {
-        auth_user_id: authUserId,
-        email: safeData.email,
-        username: safeData.username,
-        first_name: safeData.first_name,
-        last_name: safeData.last_name,
-        phone_number: safeData.phone_number,
-        street_address: safeData.street_address,
-        address_line_2: safeData.address_line_2 || null,
-        city: safeData.city,
-        state_or_territory: safeData.state_or_territory as USStateTerritory,
-        postal_code: safeData.postal_code,
-        country: safeData.country,
-        role: safeData.role as RoleEnum,
+export async function POST() {
+  // Only read from HttpOnly cookies.
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  const user = (data as { user?: SupabaseUser | null })?.user ?? null;
+  if (!user)
+    return NextResponse.json(
+      { error: "Unauthorized." },
+      {
+        status: 401,
       },
-    });
-
-    const { revalidatePath, revalidateTag } = await import("next/cache");
-    await revalidateTag(`user-${authUserId}`);
-    await revalidateTag(`profile-${authUserId}`);
-    await revalidateTag(`user-${user.id}`);
-    await revalidateTag(`profile-${user.id}`);
-    await revalidatePath("/dashboard");
-    await revalidatePath("/api/user/profile");
-
-    return new Response(JSON.stringify({ user }), {
-      status: 201,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    console.error("Onboard POST error:", err);
-    return new Response(
-      JSON.stringify({
-        message: "Internal error",
-        details: err instanceof Error ? err.message : String(err),
-      }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
     );
+
+  // Check user onboard status early:
+  const existing = await prisma.user.findUnique({
+    where: { auth_user_id: user.id },
+  });
+  if (existing) {
+    // Clear profileDraft server-side after successful write:
+    try {
+      await supabase.auth.updateUser?.({ data: { profileDraft: null } });
+    } catch {
+      // Ignore non-critical failures.
+    }
+    return NextResponse.json({ ok: true }, { status: 200 });
+  }
+
+  // Build draft from user metadata.
+  const draft = user.user_metadata?.profileDraft ?? null;
+  if (!draft) {
+    return NextResponse.json(
+      { error: "No profile draft available." },
+      {
+        status: 400,
+      },
+    );
+  }
+
+  // Validate draft.
+  const parse = ProfileDraftSchema.safeParse(draft);
+  if (!parse.success) {
+    return NextResponse.json(
+      { error: "Invalid draft.", details: parse.error.issues },
+      {
+        status: 400,
+      },
+    );
+  }
+
+  const p = parse.data;
+
+  // Normalize values so that they match Prisma expectations:
+  const normalizePhone = (input?: string): string | null => {
+    if (!input) return null;
+    const digits = input.replace(/\D/g, "");
+    if (digits.length === 10) return `+1${digits}`;
+    if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+    return null;
+  };
+
+  const phoneNumber = normalizePhone(p.phoneNumber ?? "");
+  if (!phoneNumber) {
+    return NextResponse.json(
+      { error: "Invalid or missing phone number." },
+      { status: 400 },
+    );
+  }
+  const normalizedPhoneNumber = phoneNumber;
+
+  // Narrow state to the literal union used in app:
+  const rawState = String(p.stateOrTerritory ?? "");
+  if (!US_STATE_CODES.includes(rawState as (typeof US_STATE_CODES)[number])) {
+    return NextResponse.json(
+      { error: "Invalid state/territory." },
+      { status: 400 },
+    );
+  }
+  const stateOrTerritoryValue = rawState as (typeof US_STATE_CODES)[number];
+
+  // Narrow role to the RoleEnum (default is "customer"):
+  const rawRole = String(p.role ?? "customer");
+  const roleValue = (ROLE_VALUES as readonly string[]).includes(rawRole)
+    ? (rawRole as (typeof ROLE_VALUES)[number])
+    : ("customer" as (typeof ROLE_VALUES)[number]);
+
+  // Coerce other required strings so TS sees concrete string types:
+  const streetAddress = String(p.streetAddress ?? "");
+  const city = String(p.city ?? "");
+  const postalCode = String(p.postalCode ?? "");
+  const country = String(p.country ?? "United States");
+
+  // Insert into DB using Prisma (NOT Supabase). This needs to be idempotent.
+  try {
+    const result = await prisma.user.createMany({
+      data: [
+        {
+          username: String(p.username),
+          auth_user_id: user.id,
+          first_name: String(p.firstName),
+          last_name: String(p.lastName),
+          email: String(p.email),
+          phone_number: normalizedPhoneNumber,
+          street_address: streetAddress,
+          address_line_2: p.addressLine2 ?? null,
+          city,
+          state_or_territory: stateOrTerritoryValue,
+          postal_code: postalCode,
+          country,
+          role: roleValue,
+        },
+      ],
+      skipDuplicates: true,
+    });
+
+    // If count === 0, then a duplicate prevented creation. This is a success.
+    if (result.count === 0) {
+      // Clear profileDraft server-side after successful write:
+      try {
+        await supabase.auth.updateUser?.({ data: { profileDraft: null } });
+      } catch {
+        // Ignore non-critical failures.
+      }
+      return NextResponse.json({ ok: true }, { status: 200 });
+    }
+
+    // Clear profileDraft server-side after successful write:
+    try {
+      await supabase.auth.updateUser?.({ data: { profileDraft: null } });
+    } catch {
+      // Ignore non-critical failures.
+    }
+
+    return NextResponse.json({ ok: true }, { status: 201 });
+  } catch (prismaErr: unknown) {
+    if (prismaErr instanceof Error) {
+      console.error("Prisma create user error:", prismaErr.message);
+    } else {
+      console.error("Prisma create user error:", prismaErr);
+    }
+    return new NextResponse("Failed to create profile", { status: 500 });
   }
 }

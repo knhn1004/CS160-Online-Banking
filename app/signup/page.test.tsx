@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { vi, beforeEach, describe, it, expect } from "vitest";
-import SignupPage from "./page";
+import SignupPage from "./SignupForm.client";
 
 vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://test.supabase.co");
 vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-anon-key");
