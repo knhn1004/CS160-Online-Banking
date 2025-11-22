@@ -97,34 +97,24 @@ export async function POST(req: Request) {
   // Create a Supabase server-side client to handle the creation of the auth user and attach user_metadata.profileDraft.
   const supabase = await createClient();
 
-  // Narrowly type the admin auth helper instead of using `any`.
-  type SupabaseAdminAuth = {
-    admin: {
-      createUser: (opts: {
-        email: string;
-        password?: string;
-        user_metadata?: unknown;
-      }) => Promise<{ data?: unknown; error?: { message?: string } }>;
-    };
-  };
-
-  const admin = (supabase.auth as unknown as SupabaseAdminAuth).admin;
-  const { error } = await admin.createUser({
-    email: parsed.data.email,
+  const { data: _data, error } = await supabase.auth.signUp({
+    email: normalizedEmail,
     password,
-    user_metadata: { profileDraft: profile },
+    options: { data: { profileDraft: profile } },
   });
 
   if (error) {
-    // If the auth user already exists, return 409.
-    if (!/already exists/i.test(error.message ?? "")) {
+    if (/already.*exists/i.test(error.message ?? "")) {
       return NextResponse.json(
         { error: "Auth user already exists." },
         { status: 409 },
       );
     }
-    // Any unexpected errors:
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[signup] signUp failed", { message: error.message, error });
+    return NextResponse.json(
+      { error: "Could not create account." },
+      { status: 502 },
+    );
   }
 
   // Supabase auth user created successfully.
