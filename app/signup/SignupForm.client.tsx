@@ -1,3 +1,4 @@
+// After the parent server component page.tsx runs, this client component should be rendered.
 "use client";
 import { useEffect, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -9,76 +10,130 @@ import { z } from "zod";
 import type { USStateTerritory } from "@/lib/schemas/user";
 import { createClient as createSupabaseClient } from "@/utils/supabase/client";
 
+// We should first pre-define what goes inside each form field based on DB expectations.
+// This is for client-side form validation.
+const PrefillSchema = SignupSchema.omit({
+  password: true,
+  confirmPassword: true,
+}); // Don't store passwords!
+type PrefillDraft = z.infer<typeof PrefillSchema>;
+
 const US_STATES = USStateTerritorySchema.options as readonly USStateTerritory[];
 
-type Props = { initialDraft?: unknown | null };
+// Type safety (reuse SignupSchema from /lib/schemas/user.ts!):
+// If the server component is edited to pass in prefilled info, this can accept it too.
+type Props = { initialDraft?: PrefillDraft | null };
 
+// Entry point for the client component (renders the interactive form & handlers).
 export default function SignupForm({ initialDraft }: Props) {
+  // We'll need redirection later.
   const router = useRouter();
+
+  // Create a browser Supabase client that is stateful, long-lived, subscribes to events, stores session info, etc.
   const supabase = createSupabaseClient();
 
+  // Local React state hooks to drive the form UI & control flows.
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [preparedEmail, setPreparedEmail] = useState<string | null>(null);
 
+  /*****************************************************************************************************************************************************************/
+  // Though the server should technically redirect earlier if the user is already signed in, this function call serves as a guardrail if for some reason, it fails.
   const tryAutoOnboard = useCallback(async (): Promise<void> => {
     try {
-      // Server will read HttpOnly cookie for session; no Authorization header here.
-      const exists = await fetch("/api/user/profile/me", { cache: "no-store" });
-      if (exists.ok) return;
-
-      // Read draft from client-side supabase user_metadata:
-      const { data: userData } = await supabase.auth.getUser();
-      const userMeta = (
-        userData?.user as { user_metadata?: unknown } | undefined
-      )?.user_metadata as { profileDraft?: unknown } | undefined;
-      const draft = userMeta?.profileDraft as
-        | Record<string, unknown>
-        | undefined;
-      if (!draft) return;
-
-      // Trigger server-side onboarding (full draft is not sent from browser to prevent malicious mutations).
-      const resp = await fetch("/api/user/onboard", { method: "POST" });
-
-      if (resp.ok) {
+      // The onboarding endpoint handles idempotency, so it's fine to POST to it.
+      // If the user already exists, the endpoint should succeed and return as such.
+      const attempt = await fetch("/api/user/onboard", { method: "POST" });
+      // We need to clear the profileDraft in the browser upon success.
+      if (attempt.ok) {
         try {
           await supabase.auth.updateUser?.({ data: { profileDraft: null } });
-        } catch {
-          // ignore
+        } catch (err) {
+          /* Non-critical client update failure. */
+          console.warn(
+            "[tryAutoOnboard] failed to clear profileDraft on client during optimistic check:",
+            err,
+          );
         }
         router.push("/dashboard");
-      } else {
-        console.warn("Auto-onboard failed:", await resp.text());
+        return;
       }
-    } catch (caught) {
-      // ignore
-      console.error("tryAutoOnboard error:", caught);
+    } catch (err) {
+      /* Network or security error; read client metadata as fallback. */
+      console.warn(
+        "[tryAutoOnboard] network or security error while contacting /api/user/onboard during optimistic check",
+        err,
+      );
+    }
+
+    // Read draft from client-side supabase user_metadata.
+    // Get current auth user and destructure the response for data component.
+    const { data: userData } = await supabase.auth.getUser();
+    // Read userData.user safely and casts it to a shape that may contain user_metadata, then extract it.
+    const userMeta = (userData?.user as { user_metadata?: unknown } | undefined)
+      ?.user_metadata as { profileDraft?: unknown } | undefined;
+    // Read profileDraft out of the metadata and cast it to a generic object shape.
+    const draft = userMeta?.profileDraft as Record<string, unknown> | undefined;
+    if (!draft) {
+      console.debug(
+        "[tryAutoOnboard] no profileDraft present, nothing to do during optimistic check",
+      );
+      return;
+    }
+
+    // Trigger server-side onboarding (full draft is not sent from browser to prevent malicious mutations).
+    // Same logic as above.
+    const resp = await fetch("/api/user/onboard", { method: "POST" });
+    if (resp.ok) {
+      try {
+        await supabase.auth.updateUser?.({ data: { profileDraft: null } });
+      } catch (err) {
+        console.warn(
+          "[tryAutoOnboard] failed to clear profileDraft on client during deliberate POST:",
+          err,
+        );
+      }
+      // Redirect the user to the dashboard.
+      router.push("/dashboard");
+    } else {
+      console.warn("Auto-onboard failed:", await resp.text());
     }
   }, [supabase, router]);
+  /*****************************************************************************************************************************************************************/
 
-  // subscribe to auth state changes to attempt server-side onboarding after sign-in
+  // Subscribe to auth state changes to attempt server-side onboarding after sign-in.
   useEffect(() => {
+    // Subscribe.
     const resp = supabase.auth.onAuthStateChange((event: string) => {
       if (event === "SIGNED_IN") void tryAutoOnboard();
     });
 
+    // Read subscription safely.
     const subscription = (
       resp?.data as { subscription?: { unsubscribe: () => void } } | undefined
     )?.subscription ?? { unsubscribe: () => {} };
 
-    // Attempt once on mount in case we're already signed in:
+    // Attempt once on mount in case we're already signed in.
     void tryAutoOnboard();
 
     return () => {
+      // Remember to unsubscribe.
       try {
-        subscription.unsubscribe();
-      } catch {
-        /* ignore */
+        if (subscription && typeof subscription.unsubscribe === "function") {
+          subscription.unsubscribe();
+        } else {
+          console.debug(
+            "[SignupForm] no valid subscription.unsubscribe to call.",
+          );
+        }
+      } catch (err) {
+        console.warn("[SignupForm] subscription.unsubscribe failed:", err);
       }
     };
   }, [supabase, tryAutoOnboard]);
 
+  // Define the form & submission behavior.
   const form = useForm({
     defaultValues: {
       username: "",
@@ -94,66 +149,40 @@ export default function SignupForm({ initialDraft }: Props) {
       stateOrTerritory: "" as "" | USStateTerritory,
       postalCode: "",
     },
-
     onSubmit: async ({ value }) => {
       setLoading(true);
       setError(null);
       setInfo(null);
 
+      // Client-side validation of submission form contents.
       try {
         const prepared = { ...value, email: value.email.trim().toLowerCase() };
         setPreparedEmail(prepared.email);
 
         const result = SignupSchema.safeParse(prepared);
         if (!result.success) {
-          throw new Error(
-            result.error.issues[0]?.message ?? "Validation failed",
-          );
+          const zErr = result.error as z.ZodError;
+          throw new Error(zErr?.issues?.[0]?.message ?? "Validation failed.");
         }
 
-        const profileToPersist = {
-          username: prepared.username,
-          firstName: prepared.firstName,
-          lastName: prepared.lastName,
-          email: prepared.email,
-          phoneNumber: prepared.phoneNumber,
-          streetAddress: prepared.streetAddress,
-          addressLine2: prepared.addressLine2 || null,
-          city: prepared.city,
-          stateOrTerritory: prepared.stateOrTerritory,
-          postalCode: prepared.postalCode,
-          country: "USA",
-          role: "customer",
-        };
+        const validated = result.data;
 
-        // client sign up - still done from browser to create the auth user and store user_metadata
-        const signupResult = await supabase.auth.signUp?.({
-          email: prepared.email,
-          password: prepared.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(
-              "/welcome",
-            )}`,
-            data: { profileDraft: profileToPersist },
-          },
+        // Server handles the sign-up.
+        const resp = await fetch("/api/user/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(validated), // This includes the password!
         });
-        console.debug("[signup] signupResult:", signupResult);
 
-        const signupError = signupResult?.error ?? null;
-
-        if (signupError) {
-          if (/already/i.test(signupError.message ?? "")) {
-            setInfo(
-              "This email is already registered. Check your inbox for the confirmation link or resend it.",
-            );
-          } else {
-            throw new Error(signupError.message ?? "Signup failed");
-          }
-          return;
+        if (!resp.ok) {
+          const body = (await resp.json().catch(() => null)) as {
+            error?: string;
+            message?: string;
+          } | null;
+          throw new Error(body?.error ?? body?.message ?? "Signup failed.");
         }
-
         setInfo(
-          "Check your email for a confirmation link to complete the onboarding process.",
+          "If an account was created, you should receive a confirmation email shortly. Please check your inbox to complete the onboarding process.",
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Signup failed.");
@@ -163,35 +192,41 @@ export default function SignupForm({ initialDraft }: Props) {
     },
   });
 
-  // restore draft provided by the server (initialDraft) or from user_metadata
+  // Restore draft provided by the server (initialDraft) or from user_metadata after signup.
+  // This is so the user doesn't lose their fields if they navigate away without their DB profile being created.
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        // prefer server-provided draft
+        // Prefer server-provided draft from page.tsx.
         if (initialDraft && mounted) {
-          const draft = initialDraft as Record<string, unknown>;
-          const rawState = String(draft["stateOrTerritory"] ?? "");
-          const stateOrTerritory =
-            rawState === "" || US_STATES.includes(rawState as USStateTerritory)
-              ? (rawState as "" | USStateTerritory)
-              : "";
+          const parsed = PrefillSchema.safeParse(initialDraft);
+          if (parsed.success) {
+            const draft = parsed.data;
+            const rawState = String(draft.stateOrTerritory ?? "");
+            const stateOrTerritory =
+              rawState === "" ||
+              US_STATES.includes(rawState as USStateTerritory)
+                ? (rawState as "" | USStateTerritory)
+                : "";
 
-          form.reset({
-            username: String(draft["username"] ?? ""),
-            email: String(draft["email"] ?? ""),
-            password: "",
-            confirmPassword: "",
-            firstName: String(draft["firstName"] ?? ""),
-            lastName: String(draft["lastName"] ?? ""),
-            phoneNumber: String(draft["phoneNumber"] ?? ""),
-            streetAddress: String(draft["streetAddress"] ?? ""),
-            addressLine2: String(draft["addressLine2"] ?? ""),
-            city: String(draft["city"] ?? ""),
-            stateOrTerritory: stateOrTerritory,
-            postalCode: String(draft["postalCode"] ?? ""),
-          });
-          return;
+            // Reset the form before filling it in.
+            form.reset({
+              username: String(draft.username ?? ""),
+              email: String(draft.email ?? ""),
+              password: "",
+              confirmPassword: "",
+              firstName: String(draft.firstName ?? ""),
+              lastName: String(draft.lastName ?? ""),
+              phoneNumber: String(draft.phoneNumber ?? ""),
+              streetAddress: String(draft.streetAddress ?? ""),
+              addressLine2: String(draft.addressLine2 ?? ""),
+              city: String(draft.city ?? ""),
+              stateOrTerritory,
+              postalCode: String(draft.postalCode ?? ""),
+            });
+            return;
+          }
         }
 
         // fallback: read from supabase user_metadata if present
@@ -223,8 +258,8 @@ export default function SignupForm({ initialDraft }: Props) {
           stateOrTerritory: stateOrTerritory,
           postalCode: String(draft["postalCode"] ?? ""),
         });
-      } catch {
-        // ignore
+      } catch (err) {
+        console.debug("[SignupForm] Draft restoration failed:", err);
       }
     })();
     return () => {
@@ -601,7 +636,7 @@ export default function SignupForm({ initialDraft }: Props) {
               value={field.state.value}
               onBlur={field.handleBlur}
               onChange={(e) =>
-                field.handleChange(e.target.value as typeof field.state.value)
+                field.handleChange(e.target.value as "" | USStateTerritory)
               }
               required
               className="w-full rounded-md border px-3 py-2"
@@ -684,18 +719,22 @@ export default function SignupForm({ initialDraft }: Props) {
               return;
             }
             try {
-              const { error: resendError } = (await supabase.auth.resend?.({
+              // Supabase client may return an untyped object.
+              // Cast to a known shape.
+              const resendResp = (await supabase.auth.resend?.({
                 type: "signup",
                 email: preparedEmail,
-              })) ?? { error: null };
-              if (resendError)
+              })) as unknown as { error?: { message?: string } } | null;
+              const resendError = resendResp?.error ?? null;
+              if (resendError) {
                 setError(
                   resendError.message ?? "Failed to resend confirmation.",
                 );
-              else
+              } else {
                 setInfo(
                   "Confirmation email sent. Check your inbox (and spam).",
                 );
+              }
             } catch (resendErr) {
               setError(
                 resendErr instanceof Error

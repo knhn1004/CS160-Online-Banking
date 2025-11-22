@@ -1,20 +1,26 @@
+// This is the parent server component for the signup page.
 import SignupForm from "./SignupForm.client";
-import { createClient } from "@/utils/supabase/server";
+import { createClient } from "@/utils/supabase/server"; //
 import { redirect } from "next/navigation";
 
+// Every time a user tries to access the signup page, this component will run.
 export default async function Page() {
-  // If your server util is synchronous, drop the `await`:
+  // Create a temporary, server-side Supabase client bound to the user's current request.
+  // This will read HttpOnly cookies because we exported from server.ts!
   const supabase = await createClient();
+
+  // Check for an existing session by seeing if the current user can be resolved using cookies.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // If already signed in, bounce to dashboard
+  // If the user is already signed in, we should redirect them to the dashboard.
   if (user) redirect("/dashboard");
 
-  // No user => no user_metadata (drafts live on the auth user)
-  const initialDraft = null;
+  // If the user is not signed in, we can start rendering the client component for the signup page.
+  const initialDraft = null; // New user -> no stored information.
 
+  // Rendering!
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
       <div className="w-full max-w-md mx-auto px-6 py-12 bg-white rounded-lg shadow-md">

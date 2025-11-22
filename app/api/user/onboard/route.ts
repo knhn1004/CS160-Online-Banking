@@ -1,128 +1,95 @@
+// api/user/onboard/route.ts assumes that the user in question has already been authenticated.
+// This endpoint handles writing profile fields to the database.
+// REMOVE THIS ENDPOINT IF SERVER ACTIONS IS ACCEPTED.
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { getPrisma } from "@/app/lib/prisma";
+import { SignupSchema } from "@/lib/schemas/user";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
+
+function isPrismaClientKnownRequestError(
+  e: unknown,
+): e is Prisma.PrismaClientKnownRequestError {
+  return typeof e === "object" && e !== null && "code" in e;
+}
 
 const prisma = getPrisma();
 
-const US_STATE_CODES = [
-  "AL",
-  "AK",
-  "AZ",
-  "AR",
-  "CA",
-  "CO",
-  "CT",
-  "DE",
-  "DC",
-  "FL",
-  "GA",
-  "HI",
-  "ID",
-  "IL",
-  "IN",
-  "IA",
-  "KS",
-  "KY",
-  "LA",
-  "ME",
-  "MD",
-  "MA",
-  "MI",
-  "MN",
-  "MS",
-  "MO",
-  "MT",
-  "NE",
-  "NV",
-  "NH",
-  "NJ",
-  "NM",
-  "NY",
-  "NC",
-  "ND",
-  "OH",
-  "OK",
-  "OR",
-  "PA",
-  "RI",
-  "SC",
-  "SD",
-  "TN",
-  "TX",
-  "UT",
-  "VT",
-  "VA",
-  "WA",
-  "WV",
-  "WI",
-  "WY",
-  "PR",
-  "GU",
-  "VI",
-  "AS",
-  "MP",
-] as const;
-
-const ROLE_VALUES = ["customer", "bank_manager"] as const;
-
-// Thin validation for the draft (adjust to match SignupSchema):
-const ProfileDraftSchema = z.object({
-  username: z.string().min(3),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  email: z.string().email(),
-  phoneNumber: z.string().optional(),
-  streetAddress: z.string().optional(),
-  addressLine2: z.string().nullable().optional(),
-  city: z.string().min(1),
-  stateOrTerritory: z.enum([...US_STATE_CODES] as unknown as [
-    string,
-    ...string[],
-  ]),
-  postalCode: z.string().min(5),
-  country: z.string().optional(),
-  role: z.enum([...ROLE_VALUES] as [string, ...string[]]).optional(),
+// Even though user_metadata is ideally validated earlier by both the client and by our signup endpoint, we want to guard anyways.
+// We can reuse schemas to simplify our code.
+const ProfileDraftSchema = SignupSchema.omit({
+  password: true,
+  confirmPassword: true,
 });
 
-// Define a minimal supabase user shape we need (avoid `any`)
-type SupabaseUser = {
-  id: string;
-  user_metadata?: {
-    profileDraft?: unknown;
-  } | null;
-};
+// We also want to normalize what goes into the database (specifically, phone number).
+const NormalizedProfileSchema = ProfileDraftSchema.extend({
+  // Normalized phone number example: "+1XXXXXXXXXX".
+  phoneNumber: z.preprocess(
+    (val) => {
+      if (typeof val !== "string") return val; // This allows null/undefined phone numbers.
+      const digits = val.replace(/\D/g, "");
+      if (digits.length === 10) return `+1${digits}`; // Assumes U.S. phone numbers ONLY.
+      // Not sure if this is needed but it's just in case a user inputs a 1 in front of the number.
+      // Technically form submission will NOT allow this input.
+      if (digits.length === 11 && digits.startsWith("1"))
+        return `+1${digits.slice(-10)}`;
+      return val; // Validator will reject later.
+    },
+    z
+      .string()
+      .regex(/^\+1\d{10}$/, { message: "Invalid U.S. phone number." })
+      .nullable()
+      .optional(),
+  ),
+});
 
 export async function POST() {
   // Only read from HttpOnly cookies.
+  // Create Supabase server-side client.
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  const user = (data as { user?: SupabaseUser | null })?.user ?? null;
-  if (!user)
+
+  // Exact return shapes.
+  type GetUserReturn = Awaited<ReturnType<typeof supabase.auth.getUser>>;
+  type UserFromGetUser = GetUserReturn["data"]["user"];
+
+  // Get authenticated user from Supabase, or else return error.
+  const getUserRet = await supabase.auth.getUser();
+  const user: UserFromGetUser = getUserRet.data?.user ?? null;
+  if (!user) {
     return NextResponse.json(
       { error: "Unauthorized." },
       {
         status: 401,
       },
     );
+  }
 
-  // Check user onboard status early:
+  // For idempotency, we should check the user's onboarding status early.
   const existing = await prisma.user.findUnique({
     where: { auth_user_id: user.id },
   });
   if (existing) {
-    // Clear profileDraft server-side after successful write:
+    // Clear profileDraft server-side if user already exists.
     try {
       await supabase.auth.updateUser?.({ data: { profileDraft: null } });
-    } catch {
+    } catch (err) {
       // Ignore non-critical failures.
+      console.debug("[onboard] failed to clear profileDraft", {
+        authUserId: user.id,
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
     return NextResponse.json({ ok: true }, { status: 200 });
   }
 
-  // Build draft from user metadata.
+  // Build draft from user metadata. If this is not possible, we cannot proceed.
   const draft = user.user_metadata?.profileDraft ?? null;
   if (!draft) {
+    console.debug("[onboard] no profileDraft in user_metadata", {
+      authUserId: user.id,
+    });
     return NextResponse.json(
       { error: "No profile draft available." },
       {
@@ -132,107 +99,86 @@ export async function POST() {
   }
 
   // Validate draft.
-  const parse = ProfileDraftSchema.safeParse(draft);
-  if (!parse.success) {
+  const parsed = NormalizedProfileSchema.safeParse(draft);
+  if (!parsed.success) {
+    console.debug("[onboard] invalid profileDraft.", {
+      authUserId: user.id,
+      issues: parsed.error.issues,
+    });
     return NextResponse.json(
-      { error: "Invalid draft.", details: parse.error.issues },
+      { error: "Invalid draft.", details: parsed.error.issues },
       {
         status: 400,
       },
     );
   }
 
-  const p = parse.data;
+  const p = parsed.data;
 
-  // Normalize values so that they match Prisma expectations:
-  const normalizePhone = (input?: string): string | null => {
-    if (!input) return null;
-    const digits = input.replace(/\D/g, "");
-    if (digits.length === 10) return `+1${digits}`;
-    if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-    return null;
-  };
-
-  const phoneNumber = normalizePhone(p.phoneNumber ?? "");
-  if (!phoneNumber) {
-    return NextResponse.json(
-      { error: "Invalid or missing phone number." },
-      { status: 400 },
-    );
-  }
-  const normalizedPhoneNumber = phoneNumber;
-
-  // Narrow state to the literal union used in app:
-  const rawState = String(p.stateOrTerritory ?? "");
-  if (!US_STATE_CODES.includes(rawState as (typeof US_STATE_CODES)[number])) {
-    return NextResponse.json(
-      { error: "Invalid state/territory." },
-      { status: 400 },
-    );
-  }
-  const stateOrTerritoryValue = rawState as (typeof US_STATE_CODES)[number];
-
-  // Narrow role to the RoleEnum (default is "customer"):
-  const rawRole = String(p.role ?? "customer");
-  const roleValue = (ROLE_VALUES as readonly string[]).includes(rawRole)
-    ? (rawRole as (typeof ROLE_VALUES)[number])
-    : ("customer" as (typeof ROLE_VALUES)[number]);
-
-  // Coerce other required strings so TS sees concrete string types:
-  const streetAddress = String(p.streetAddress ?? "");
-  const city = String(p.city ?? "");
-  const postalCode = String(p.postalCode ?? "");
-  const country = String(p.country ?? "United States");
-
-  // Insert into DB using Prisma (NOT Supabase). This needs to be idempotent.
-  // TO-DO: Change to upsert instead of createMany (think this is optional though).
+  // Upsert into DB using Prisma (NOT Supabase). This needs to be idempotent.
   try {
-    const result = await prisma.user.createMany({
-      data: [
-        {
-          username: String(p.username),
-          auth_user_id: user.id,
-          first_name: String(p.firstName),
-          last_name: String(p.lastName),
-          email: String(p.email),
-          phone_number: normalizedPhoneNumber,
-          street_address: streetAddress,
-          address_line_2: p.addressLine2 ?? null,
-          city,
-          state_or_territory: stateOrTerritoryValue,
-          postal_code: postalCode,
-          country,
-          role: roleValue,
-        },
-      ],
-      skipDuplicates: true,
+    await prisma.user.upsert({
+      where: { auth_user_id: user.id },
+      update: {}, // If the user already exists, we don't want to update anything.
+      create: {
+        username: String(p.username),
+        auth_user_id: user.id,
+        first_name: String(p.firstName),
+        last_name: String(p.lastName),
+        email: String(p.email),
+        phone_number: String(p.phoneNumber ?? null),
+        street_address: p.streetAddress ?? "",
+        address_line_2: p.addressLine2 ?? null,
+        city: p.city ?? "",
+        state_or_territory: p.stateOrTerritory,
+        postal_code: p.postalCode ?? "",
+        country: "United States",
+        role: "customer",
+      },
     });
-
-    // If count === 0, then a duplicate prevented creation. This is a success.
-    if (result.count === 0) {
-      // Clear profileDraft server-side after successful write:
-      try {
-        await supabase.auth.updateUser?.({ data: { profileDraft: null } });
-      } catch {
-        // Ignore non-critical failures.
-      }
-      return NextResponse.json({ ok: true }, { status: 200 });
-    }
 
     // Clear profileDraft server-side after successful write:
     try {
       await supabase.auth.updateUser?.({ data: { profileDraft: null } });
-    } catch {
+    } catch (err) {
       // Ignore non-critical failures.
+      console.debug("[onboard] failed to clear profileDraft.", {
+        authUserId: user.id,
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
     }
-
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (prismaErr: unknown) {
-    if (prismaErr instanceof Error) {
-      console.error("Prisma create user error:", prismaErr.message);
-    } else {
-      console.error("Prisma create user error:", prismaErr);
+    // Some fields in the database are unique, and so we need to guard against this case.
+    // This is checked in the signup endpoint FIRST though, so this is a just-in-case.
+    if (isPrismaClientKnownRequestError(prismaErr)) {
+      if (prismaErr.code === "P2002") {
+        const meta = prismaErr as { target?: string[] | string } | undefined;
+        const target = Array.isArray(meta?.target)
+          ? meta.target.join(",")
+          : meta?.target;
+        return NextResponse.json(
+          {
+            error: "Conflict",
+            field: target ?? "unknown",
+            message: "A record with that value already exists.",
+          },
+          { status: 409 },
+        );
+      }
     }
-    return new NextResponse("Failed to create profile", { status: 500 });
+
+    // Fallback: log and return 500.
+    console.error("[onboard] Prisma upsert failed", {
+      authUserId: user?.id,
+      message:
+        prismaErr instanceof Error ? prismaErr.message : String(prismaErr),
+      stack: prismaErr instanceof Error ? prismaErr.stack : undefined,
+    });
+    return NextResponse.json(
+      { error: "Failed to persist profile" },
+      { status: 500 },
+    );
   }
 }
