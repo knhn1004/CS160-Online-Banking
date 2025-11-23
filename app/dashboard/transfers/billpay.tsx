@@ -140,6 +140,14 @@ export function BillPay() {
         const frequency =
           frequencyPreset === "custom" ? customFrequency : frequencyPreset;
 
+        // Convert datetime-local format to ISO datetime string
+        const startTimeISO = value.start_time
+          ? new Date(value.start_time).toISOString()
+          : "";
+        const endTimeISO = value.end_time
+          ? new Date(value.end_time).toISOString()
+          : undefined;
+
         const requestBody: {
           source_account_id: number;
           payee_id?: number;
@@ -152,7 +160,7 @@ export function BillPay() {
           source_account_id: value.source_account_id,
           amount: value.amount,
           frequency,
-          start_time: value.start_time,
+          start_time: startTimeISO,
         };
 
         if (value.payee_id) {
@@ -161,8 +169,8 @@ export function BillPay() {
           requestBody.payee = value.payee;
         }
 
-        if (value.end_time) {
-          requestBody.end_time = value.end_time;
+        if (endTimeISO) {
+          requestBody.end_time = endTimeISO;
         }
 
         const response = await fetch("/api/billpay/rules", {
@@ -328,8 +336,17 @@ export function BillPay() {
     }
 
     form.setFieldValue("frequency", rule.frequency);
-    form.setFieldValue("start_time", rule.start_time);
-    form.setFieldValue("end_time", rule.end_time || "");
+    // Convert ISO datetime to datetime-local format
+    form.setFieldValue(
+      "start_time",
+      rule.start_time
+        ? new Date(rule.start_time).toISOString().slice(0, 16)
+        : "",
+    );
+    form.setFieldValue(
+      "end_time",
+      rule.end_time ? new Date(rule.end_time).toISOString().slice(0, 16) : "",
+    );
     setSelectedPayeeId(rule.payee_id);
     setFormState("filling");
   };
@@ -377,10 +394,14 @@ export function BillPay() {
         updateData.frequency = frequency;
       }
       if (value.start_time) {
-        updateData.start_time = value.start_time;
+        // Convert datetime-local format to ISO datetime string
+        updateData.start_time = new Date(value.start_time).toISOString();
       }
       if (value.end_time !== undefined) {
-        updateData.end_time = value.end_time || null;
+        // Convert datetime-local format to ISO datetime string
+        updateData.end_time = value.end_time
+          ? new Date(value.end_time).toISOString()
+          : null;
       }
 
       const response = await fetch(`/api/billpay/rules/${editingRuleId}`, {
@@ -719,7 +740,33 @@ export function BillPay() {
                     )}
                   </form.Field>
 
-                  <form.Field name="amount">
+                  <form.Field
+                    name="amount"
+                    validators={{
+                      onChange: ({ value }) => {
+                        if (!value || value.trim() === "")
+                          return "Amount is required";
+                        const numValue = parseFloat(value);
+                        if (isNaN(numValue) || numValue <= 0)
+                          return "Amount must be greater than $0.00";
+                        if (numValue < 0.01)
+                          return "Amount must be at least $0.01";
+                        if (numValue > 9999999.99)
+                          return "Amount cannot exceed $9,999,999.99";
+
+                        // Check if amount exceeds source account balance
+                        const sourceAccount = accounts.find(
+                          (acc) =>
+                            acc.id === form.getFieldValue("source_account_id"),
+                        );
+                        if (sourceAccount && numValue > sourceAccount.balance) {
+                          return "Insufficient funds";
+                        }
+
+                        return undefined;
+                      },
+                    }}
+                  >
                     {(field) => (
                       <div className="space-y-2">
                         <label htmlFor="amount" className="text-sm font-medium">
@@ -1029,6 +1076,15 @@ export function BillPay() {
                   if (numValue < 0.01) return "Amount must be at least $0.01";
                   if (numValue > 9999999.99)
                     return "Amount cannot exceed $9,999,999.99";
+
+                  // Check if amount exceeds source account balance
+                  const sourceAccount = accounts.find(
+                    (acc) => acc.id === form.getFieldValue("source_account_id"),
+                  );
+                  if (sourceAccount && numValue > sourceAccount.balance) {
+                    return "Insufficient funds";
+                  }
+
                   return undefined;
                 },
               }}
@@ -1173,27 +1229,33 @@ export function BillPay() {
             <form.Field name="source_account_id">
               {({ state: sourceState }) => (
                 <form.Field name="amount">
-                  {({ state: amountState }) => {
-                    const isDisabled =
-                      !sourceState.value ||
-                      sourceState.value === 0 ||
-                      !selectedPayeeId ||
-                      !amountState.value ||
-                      amountState.value.trim() === "" ||
-                      parseFloat(amountState.value) <= 0 ||
-                      amountState.meta.errors.length > 0 ||
-                      !form.getFieldValue("start_time");
-                    return (
-                      <Button
-                        type="submit"
-                        disabled={isDisabled}
-                        className="w-full"
-                      >
-                        Create Auto Payment Rule
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    );
-                  }}
+                  {({ state: amountState }) => (
+                    <form.Field name="start_time">
+                      {({ state: startTimeState }) => {
+                        const isDisabled =
+                          !sourceState.value ||
+                          sourceState.value === 0 ||
+                          !selectedPayeeId ||
+                          !amountState.value ||
+                          amountState.value.trim() === "" ||
+                          parseFloat(amountState.value) <= 0 ||
+                          amountState.meta.errors.length > 0 ||
+                          !startTimeState.value ||
+                          startTimeState.value.trim() === "" ||
+                          startTimeState.meta.errors.length > 0;
+                        return (
+                          <Button
+                            type="submit"
+                            disabled={isDisabled}
+                            className="w-full"
+                          >
+                            Create Auto Payment Rule
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        );
+                      }}
+                    </form.Field>
+                  )}
                 </form.Field>
               )}
             </form.Field>
