@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from "react";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 export default function AuthCallback() {
   useEffect(() => {
@@ -26,14 +27,16 @@ export default function AuthCallback() {
       // 2) subscribe to auth state change and redirect on SIGNED_IN
       const {
         data: { subscription },
-      } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === "SIGNED_IN" && session) {
-          try {
-            subscription.unsubscribe();
-          } catch {}
-          if (mounted) window.location.assign("/");
-        }
-      });
+      } = supabase.auth.onAuthStateChange(
+        (event: AuthChangeEvent, session: Session | null) => {
+          if (event === "SIGNED_IN" && session) {
+            try {
+              subscription.unsubscribe();
+            } catch {}
+            if (mounted) window.location.assign("/");
+          }
+        },
+      );
     })();
 
     return () => {
