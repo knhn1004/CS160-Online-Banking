@@ -9,9 +9,16 @@ import { ExternalTransfer } from "./external-transfer";
 import { BillPay } from "./billpay";
 import { Breadcrumbs } from "./breadcrumbs";
 
+const TAB_NAMES: Record<string, string> = {
+  internal: "Internal Transfer",
+  external: "External Transfer",
+  billpay: "Bill Pay",
+};
+
 export default function TransfersPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("internal");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -40,9 +47,14 @@ export default function TransfersPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <Breadcrumbs />
+      <Breadcrumbs currentPage={TAB_NAMES[activeTab]} />
       <h1 className="mb-6 text-3xl font-bold">Money Transfers</h1>
-      <Tabs defaultValue="internal" className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        defaultValue="internal"
+        className="w-full"
+      >
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="internal">Internal Transfer</TabsTrigger>
           <TabsTrigger value="external">External Transfer</TabsTrigger>

@@ -199,6 +199,28 @@ export function ExternalTransfer() {
       return;
     }
 
+    // Validate email format if provided
+    if (email && email.trim() !== "") {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        setLookupError("Please enter a valid email address");
+        return;
+      }
+    }
+
+    // Validate phone number format if provided
+    if (phone && phone.trim() !== "") {
+      const digitsOnly = phone.replace(/\D/g, "");
+      if (digitsOnly.length < 10) {
+        setLookupError("Phone number must contain at least 10 digits");
+        return;
+      }
+      if (digitsOnly.length > 15) {
+        setLookupError("Phone number cannot exceed 15 digits");
+        return;
+      }
+    }
+
     setLookupLoading(true);
     setLookupError(null);
     setLookupResult(null);
@@ -227,7 +249,19 @@ export function ExternalTransfer() {
       );
 
       if (!response.ok) {
-        const data = (await response.json()) as { error: string };
+        const data = (await response.json()) as {
+          error: string;
+          details?: Array<{ message: string; path: string[] }>;
+        };
+
+        // extracting specific error message for email validation
+        if (data.details && data.details.length > 0) {
+          const emailError = data.details.find((d) => d.path.includes("email"));
+          if (emailError) {
+            throw new Error("Invalid email address");
+          }
+        }
+
         throw new Error(data.error || "Lookup failed");
       }
 
@@ -244,7 +278,22 @@ export function ExternalTransfer() {
         }
       }
     } catch (err) {
-      setLookupError(err instanceof Error ? err.message : "Lookup failed");
+      const errorMessage = err instanceof Error ? err.message : "Lookup failed";
+
+      if (
+        errorMessage.includes("query parameters") ||
+        errorMessage.includes("Invalid")
+      ) {
+        if (email && email.trim() !== "") {
+          setLookupError("Invalid email address");
+        } else if (phone && phone.trim() !== "") {
+          setLookupError("Invalid phone number");
+        } else {
+          setLookupError("Invalid recipient information");
+        }
+      } else {
+        setLookupError(errorMessage);
+      }
       setLookupResult({ found: false });
     } finally {
       setLookupLoading(false);
@@ -252,6 +301,11 @@ export function ExternalTransfer() {
   };
 
   const handleContinue = () => {
+    if (!lookupResult || lookupResult.found !== true) {
+      setError("Please lookup and select a recipient first");
+      return;
+    }
+
     const recipientEmail = form.getFieldValue("recipient_email");
     const recipientPhone = form.getFieldValue("recipient_phone");
     const destinationAccountId = form.getFieldValue("destination_account_id");
@@ -269,6 +323,7 @@ export function ExternalTransfer() {
     const result = ExternalTransferSchema.safeParse(formData);
 
     if (result.success) {
+      setError(null);
       setFormState("reviewing");
     } else {
       setError(result.error.issues.map((i) => i.message).join(", "));
@@ -528,7 +583,24 @@ export function ExternalTransfer() {
           <div className="space-y-4">
             <div className="text-sm font-medium">Recipient</div>
             <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
-              <form.Field name="recipient_email">
+              <form.Field
+                name="recipient_email"
+                validators={{
+                  onChange: ({ value }) => {
+                    if (!value || value.trim() === "") {
+                      // allow empty if phone is provided
+                      return undefined;
+                    }
+
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(value.trim())) {
+                      return "Please enter a valid email address";
+                    }
+
+                    return undefined;
+                  },
+                }}
+              >
                 {(field) => (
                   <div className="space-y-2">
                     <label
@@ -542,10 +614,22 @@ export function ExternalTransfer() {
                       id="recipient_email"
                       type="email"
                       value={field.state.value || ""}
-                      onChange={(e) => field.handleChange(e.target.value)}
+                      onChange={(e) => {
+                        field.handleChange(e.target.value);
+
+                        if (lookupResult) {
+                          setLookupResult(null);
+                          setLookupError(null);
+                        }
+                      }}
                       placeholder="recipient@example.com"
                       disabled={lookupLoading}
                     />
+                    {field.state.meta.errors.length > 0 && (
+                      <p className="text-sm text-warning">
+                        {field.state.meta.errors[0]}
+                      </p>
+                    )}
                   </div>
                 )}
               </form.Field>
@@ -554,26 +638,94 @@ export function ExternalTransfer() {
                 or
               </div>
 
-              <form.Field name="recipient_phone">
-                {(field) => (
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="recipient_phone"
-                      className="text-sm font-medium flex items-center gap-2"
-                    >
-                      <Phone className="h-4 w-4" />
-                      Phone Number
-                    </label>
-                    <Input
-                      id="recipient_phone"
-                      type="tel"
-                      value={field.state.value || ""}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      placeholder="+1234567890"
-                      disabled={lookupLoading}
-                    />
-                  </div>
-                )}
+              <form.Field
+                name="recipient_phone"
+                validators={{
+                  onChange: ({ value }) => {
+                    if (!value || value.trim() === "") {
+                      return undefined;
+                    }
+
+                    const digitsOnly = value.replace(/\D/g, "");
+
+                    if (digitsOnly.length < 10) {
+                      return "Phone number must contain at least 10 digits";
+                    }
+
+                    if (digitsOnly.length > 15) {
+                      return "Phone number cannot exceed 15 digits";
+                    }
+
+                    if (digitsOnly.length === 0) {
+                      return "Phone number must contain at least one digit";
+                    }
+
+                    if (digitsOnly.length === 11 && digitsOnly[0] !== "1") {
+                      return "If using 11 digits, phone number must start with 1";
+                    }
+
+                    return undefined;
+                  },
+                }}
+              >
+                {(field) => {
+                  const handlePhoneChange = (
+                    e: React.ChangeEvent<HTMLInputElement>,
+                  ) => {
+                    const input = e.target.value;
+
+                    let cleaned = input.replace(/[^\d+]/g, "");
+
+                    if (cleaned.includes("+")) {
+                      const plusIndex = cleaned.indexOf("+");
+                      if (plusIndex > 0) {
+                        // remove + if it's not at the start
+                        cleaned = cleaned.replace(/\+/g, "");
+                      } else if (
+                        plusIndex === 0 &&
+                        cleaned.length > 1 &&
+                        cleaned[1] === "+"
+                      ) {
+                        // remove duplicate + signs
+                        cleaned = "+" + cleaned.slice(1).replace(/\+/g, "");
+                      }
+                    }
+
+                    field.handleChange(cleaned);
+                  };
+
+                  return (
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="recipient_phone"
+                        className="text-sm font-medium flex items-center gap-2"
+                      >
+                        <Phone className="h-4 w-4" />
+                        Phone Number
+                      </label>
+                      <Input
+                        id="recipient_phone"
+                        type="tel"
+                        value={field.state.value || ""}
+                        onChange={(e) => {
+                          handlePhoneChange(e);
+
+                          if (lookupResult) {
+                            setLookupResult(null);
+                            setLookupError(null);
+                          }
+                        }}
+                        placeholder="+1234567890"
+                        disabled={lookupLoading}
+                      />
+                      {field.state.meta.errors.length > 0 && (
+                        <p className="text-sm text-warning">
+                          {field.state.meta.errors[0]}
+                        </p>
+                      )}
+                    </div>
+                  );
+                }}
               </form.Field>
 
               <Button
@@ -731,12 +883,11 @@ export function ExternalTransfer() {
                 {({ state: destState }) => (
                   <form.Field name="amount">
                     {({ state: amountState }) => {
-                      // For mock users (black hole) or users without accounts, destState.value may be undefined
-                      // Allow continue if we have a lookup result (found === true) or recipient info is filled
-                      const hasRecipient =
-                        lookupResult?.found ||
-                        form.getFieldValue("recipient_email") ||
-                        form.getFieldValue("recipient_phone");
+                      // Require a successful lookup result (found === true)
+                      // OR a destination_account_id (for cases where lookup was done but account selection is needed)
+                      const hasSelectedRecipient =
+                        lookupResult?.found === true ||
+                        destState.value !== undefined;
 
                       // Only require destination_account_id if recipient has accounts
                       const requiresDestinationAccount =
@@ -747,12 +898,12 @@ export function ExternalTransfer() {
                       const isDisabled =
                         !sourceState.value ||
                         sourceState.value === 0 ||
+                        !hasSelectedRecipient ||
                         (requiresDestinationAccount && !destState.value) ||
                         !amountState.value ||
                         amountState.value.trim() === "" ||
                         parseFloat(amountState.value) <= 0 ||
-                        amountState.meta.errors.length > 0 ||
-                        !hasRecipient;
+                        amountState.meta.errors.length > 0;
                       return (
                         <Button
                           type="button"
