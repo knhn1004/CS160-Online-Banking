@@ -20,7 +20,6 @@ import {
   InternalAccountResponse,
 } from "@/lib/schemas/transfer";
 import { formatCurrency } from "@/lib/utils";
-import { Breadcrumbs } from "./breadcrumbs";
 import { CurrencyInputField } from "./currency-input";
 
 type FormState =
@@ -251,7 +250,6 @@ export function InternalTransfer() {
   if (formState === "success" && successData) {
     return (
       <div className="space-y-6">
-        <Breadcrumbs currentPage="Internal Transfer" />
         <Card>
           <CardHeader>
             <CardTitle className="text-center text-success">
@@ -371,7 +369,6 @@ export function InternalTransfer() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs currentPage="Internal Transfer" />
       <Card>
         <CardHeader>
           <CardTitle>Internal Transfer</CardTitle>
