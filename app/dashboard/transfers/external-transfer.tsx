@@ -199,6 +199,19 @@ export function ExternalTransfer() {
       return;
     }
 
+    // Validate phone number format if provided
+    if (phone && phone.trim() !== "") {
+      const digitsOnly = phone.replace(/\D/g, "");
+      if (digitsOnly.length < 10) {
+        setLookupError("Phone number must contain at least 10 digits");
+        return;
+      }
+      if (digitsOnly.length > 15) {
+        setLookupError("Phone number cannot exceed 15 digits");
+        return;
+      }
+    }
+
     setLookupLoading(true);
     setLookupError(null);
     setLookupResult(null);
@@ -554,26 +567,87 @@ export function ExternalTransfer() {
                 or
               </div>
 
-              <form.Field name="recipient_phone">
-                {(field) => (
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="recipient_phone"
-                      className="text-sm font-medium flex items-center gap-2"
-                    >
-                      <Phone className="h-4 w-4" />
-                      Phone Number
-                    </label>
-                    <Input
-                      id="recipient_phone"
-                      type="tel"
-                      value={field.state.value || ""}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      placeholder="+1234567890"
-                      disabled={lookupLoading}
-                    />
-                  </div>
-                )}
+              <form.Field
+                name="recipient_phone"
+                validators={{
+                  onChange: ({ value }) => {
+                    if (!value || value.trim() === "") {
+                      return undefined;
+                    }
+
+                    const digitsOnly = value.replace(/\D/g, "");
+
+                    if (digitsOnly.length < 10) {
+                      return "Phone number must contain at least 10 digits";
+                    }
+
+                    if (digitsOnly.length > 15) {
+                      return "Phone number cannot exceed 15 digits";
+                    }
+
+                    if (digitsOnly.length === 0) {
+                      return "Phone number must contain at least one digit";
+                    }
+
+                    if (digitsOnly.length === 11 && digitsOnly[0] !== "1") {
+                      return "If using 11 digits, phone number must start with 1";
+                    }
+
+                    return undefined;
+                  },
+                }}
+              >
+                {(field) => {
+                  const handlePhoneChange = (
+                    e: React.ChangeEvent<HTMLInputElement>,
+                  ) => {
+                    const input = e.target.value;
+
+                    let cleaned = input.replace(/[^\d+]/g, "");
+
+                    if (cleaned.includes("+")) {
+                      const plusIndex = cleaned.indexOf("+");
+                      if (plusIndex > 0) {
+                        // remove + if it's not at the start
+                        cleaned = cleaned.replace(/\+/g, "");
+                      } else if (
+                        plusIndex === 0 &&
+                        cleaned.length > 1 &&
+                        cleaned[1] === "+"
+                      ) {
+                        // remove duplicate + signs
+                        cleaned = "+" + cleaned.slice(1).replace(/\+/g, "");
+                      }
+                    }
+
+                    field.handleChange(cleaned);
+                  };
+
+                  return (
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="recipient_phone"
+                        className="text-sm font-medium flex items-center gap-2"
+                      >
+                        <Phone className="h-4 w-4" />
+                        Phone Number
+                      </label>
+                      <Input
+                        id="recipient_phone"
+                        type="tel"
+                        value={field.state.value || ""}
+                        onChange={handlePhoneChange}
+                        placeholder="+1234567890"
+                        disabled={lookupLoading}
+                      />
+                      {field.state.meta.errors.length > 0 && (
+                        <p className="text-sm text-warning">
+                          {field.state.meta.errors[0]}
+                        </p>
+                      )}
+                    </div>
+                  );
+                }}
               </form.Field>
 
               <Button
