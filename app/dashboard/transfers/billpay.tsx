@@ -1292,11 +1292,23 @@ function BillPayeeForm({
     account_number: "",
     routing_number: "",
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = () => {
-    const result = BillPayPayeeSchema.safeParse(formData);
+    // Ensure state is always CA
+    const dataToSubmit = { ...formData, state_or_territory: "CA" };
+    const result = BillPayPayeeSchema.safeParse(dataToSubmit);
     if (result.success) {
+      setErrors({});
       onSubmit(result.data);
+    } else {
+      // Extract and format validation errors
+      const formattedErrors: Record<string, string> = {};
+      result.error.issues.forEach((issue) => {
+        const path = issue.path.join(".");
+        formattedErrors[path] = issue.message;
+      });
+      setErrors(formattedErrors);
     }
   };
 
@@ -1304,70 +1316,134 @@ function BillPayeeForm({
     <div className="space-y-3 rounded-lg border bg-card p-4">
       <h3 className="font-medium">Create New Payee</h3>
       <div className="space-y-3">
-        <Input
-          placeholder="Business Name"
-          value={formData.business_name}
-          onChange={(e) =>
-            setFormData({ ...formData, business_name: e.target.value })
-          }
-          required
-        />
-        <Input
-          type="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          required
-        />
-        <Input
-          placeholder="Phone"
-          value={formData.phone}
-          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-          required
-        />
-        <Input
-          placeholder="Street Address"
-          value={formData.street_address}
-          onChange={(e) =>
-            setFormData({ ...formData, street_address: e.target.value })
-          }
-          required
-        />
+        <div>
+          <Input
+            placeholder="Business Name"
+            value={formData.business_name}
+            onChange={(e) => {
+              setFormData({ ...formData, business_name: e.target.value });
+              if (errors.business_name)
+                setErrors({ ...errors, business_name: "" });
+            }}
+            required
+          />
+          {errors.business_name && (
+            <p className="text-sm text-warning mt-1">{errors.business_name}</p>
+          )}
+        </div>
+        <div>
+          <Input
+            type="email"
+            placeholder="Email"
+            value={formData.email}
+            onChange={(e) => {
+              setFormData({ ...formData, email: e.target.value });
+              if (errors.email) setErrors({ ...errors, email: "" });
+            }}
+            required
+          />
+          {errors.email && (
+            <p className="text-sm text-warning mt-1">{errors.email}</p>
+          )}
+        </div>
+        <div>
+          <Input
+            placeholder="Phone"
+            value={formData.phone}
+            onChange={(e) => {
+              setFormData({ ...formData, phone: e.target.value });
+              if (errors.phone) setErrors({ ...errors, phone: "" });
+            }}
+            required
+          />
+          {errors.phone && (
+            <p className="text-sm text-warning mt-1">{errors.phone}</p>
+          )}
+        </div>
+        <div>
+          <Input
+            placeholder="Street Address"
+            value={formData.street_address}
+            onChange={(e) => {
+              setFormData({ ...formData, street_address: e.target.value });
+              if (errors.street_address)
+                setErrors({ ...errors, street_address: "" });
+            }}
+            required
+          />
+          {errors.street_address && (
+            <p className="text-sm text-warning mt-1">{errors.street_address}</p>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <Input
             placeholder="City"
             value={formData.city}
-            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, city: e.target.value });
+              if (errors.city) setErrors({ ...errors, city: "" });
+            }}
             required
           />
           <Input
             placeholder="Postal Code"
             value={formData.postal_code}
-            onChange={(e) =>
-              setFormData({ ...formData, postal_code: e.target.value })
-            }
+            onChange={(e) => {
+              setFormData({ ...formData, postal_code: e.target.value });
+              if (errors.postal_code) setErrors({ ...errors, postal_code: "" });
+            }}
             required
           />
         </div>
+        {errors.postal_code && (
+          <p className="text-sm text-warning">{errors.postal_code}</p>
+        )}
         <div className="grid grid-cols-2 gap-2">
-          <Input
-            placeholder="Account Number"
-            value={formData.account_number}
-            onChange={(e) =>
-              setFormData({ ...formData, account_number: e.target.value })
-            }
-            required
-          />
-          <Input
-            placeholder="Routing Number"
-            value={formData.routing_number}
-            onChange={(e) =>
-              setFormData({ ...formData, routing_number: e.target.value })
-            }
-            required
-            maxLength={9}
-          />
+          <div>
+            <Input
+              placeholder="Account Number"
+              value={formData.account_number}
+              onChange={(e) => {
+                setFormData({ ...formData, account_number: e.target.value });
+                if (errors.account_number)
+                  setErrors({ ...errors, account_number: "" });
+              }}
+              required
+              maxLength={17}
+            />
+            {errors.account_number && (
+              <p className="text-sm text-warning mt-1">
+                {errors.account_number}
+              </p>
+            )}
+          </div>
+          <div>
+            <Input
+              placeholder="Routing Number"
+              value={formData.routing_number}
+              onChange={(e) => {
+                setFormData({ ...formData, routing_number: e.target.value });
+                if (errors.routing_number)
+                  setErrors({ ...errors, routing_number: "" });
+              }}
+              required
+              maxLength={9}
+            />
+            {errors.routing_number && (
+              <p className="text-sm text-warning mt-1">
+                {errors.routing_number}
+              </p>
+            )}
+          </div>
         </div>
+        {Object.keys(errors).length > 0 && (
+          <div
+            className="rounded-md bg-destructive/20 border border-destructive/50 p-3 text-sm text-destructive"
+            role="alert"
+          >
+            Please fix the errors above before submitting.
+          </div>
+        )}
         <div className="flex gap-2">
           <Button type="button" onClick={handleSubmit} className="flex-1">
             Create
