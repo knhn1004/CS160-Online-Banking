@@ -1,98 +1,149 @@
-import { render, screen } from "@testing-library/react";
-import SignupPage from "./page";
+import React from "react";
+import { render, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { describe, it, afterEach, vi } from "vitest";
+import SignupPageClient from "./SignupPageClient";
+import { USStateTerritory } from "../../lib/schemas/user";
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
-vi.mock("@/utils/supabase/client", () => ({
-  createClient: () => ({
-    auth: {
-      getUser: () =>
-        Promise.resolve({
-          data: { user: null },
-          error: null,
-        }),
-      signUp: () =>
-        Promise.resolve({
-          data: { user: { id: "test-user-id" } },
-          error: null,
-        }),
-    },
-  }),
-}));
+describe("SignupPageClient (client-side behaviour)", () => {
+  const formId = "signup-form-test";
 
-// Mock fetch for the API call
-global.fetch = vi.fn(() =>
-  Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve({ message: "User created successfully" }),
-  } as Response),
-);
+  function makeBasicForm(includeAllNames = true) {
+    const existing = document.getElementById(formId);
+    if (existing) existing.remove();
+    const container = document.createElement("div");
+    container.innerHTML = `
+      <form id="${formId}">
+        <input id="username" name="username" />
+        <input id="email" name="email" />
+        <input id="password" name="password" />
+        <input id="confirmPassword" name="confirmPassword" />
+        <input id="firstName" name="firstName" />
+        <input id="lastName" name="lastName" />
+        <input id="phoneNumber" name="phoneNumber" />
+        <input id="streetAddress" name="streetAddress" />
+        <input id="addressLine2" name="addressLine2" />
+        <input id="city" name="city" />
+        <select id="stateOrTerritory" name="stateOrTerritory">
+          <option value="">Select</option>
+          <option value="AL">AL</option>
+        </select>
+        <input id="postalCode" name="postalCode" />
+        <p id="username-error"></p>
+        <p id="email-error"></p>
+        <p id="password-error"></p>
+        <p id="confirmPassword-error"></p>
+        <p id="firstName-error"></p>
+        <p id="lastName-error"></p>
+        <p id="phoneNumber-error"></p>
+        <p id="streetAddress-error"></p>
+        <p id="addressLine2-error"></p>
+        <p id="city-error"></p>
+        <p id="stateOrTerritory-error"></p>
+        <p id="postalCode-error"></p>
+      </form>
+    `;
+    if (!includeAllNames) {
+      const el = container.querySelector("[name='email']");
+      if (el) el.removeAttribute("name");
+    }
+    document.body.appendChild(container);
+    return container;
+  }
 
-describe("SignupPage", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it("prefills inputs from initialDraft", async () => {
+    makeBasicForm(true);
+    const initialDraft = {
+      username: "alice",
+      email: "alice@example.com",
+      firstName: "Alice",
+      lastName: "Smith",
+      phoneNumber: "+11234567890",
+      streetAddress: "1 Road",
+      addressLine2: "Apt 2",
+      city: "Town",
+      stateOrTerritory: "AL" as unknown as USStateTerritory,
+      postalCode: "12345",
+    };
+
+    render(<SignupPageClient formId={formId} initialDraft={initialDraft} />);
+
+    await waitFor(() => {
+      expect(
+        (document.getElementById("username") as HTMLInputElement).value,
+      ).toBe("alice");
+    });
+
+    expect((document.getElementById("email") as HTMLInputElement).value).toBe(
+      "alice@example.com",
+    );
+    expect(
+      (document.getElementById("firstName") as HTMLInputElement).value,
+    ).toBe("Alice");
+    expect(
+      (document.getElementById("lastName") as HTMLInputElement).value,
+    ).toBe("Smith");
+    expect(
+      (document.getElementById("phoneNumber") as HTMLInputElement).value,
+    ).toBe("+11234567890");
+    expect(
+      (document.getElementById("streetAddress") as HTMLInputElement).value,
+    ).toBe("1 Road");
+    expect(
+      (document.getElementById("addressLine2") as HTMLInputElement).value,
+    ).toBe("Apt 2");
+    expect((document.getElementById("city") as HTMLInputElement).value).toBe(
+      "Town",
+    );
+    const stateEl = document.getElementById("stateOrTerritory");
+    if (!(stateEl instanceof HTMLSelectElement))
+      throw new Error("expected #stateOrTerritory to be a <select>");
+    expect(stateEl.value).toBe("AL");
+    expect(
+      (document.getElementById("postalCode") as HTMLInputElement).value,
+    ).toBe("12345");
   });
 
-  it("renders all required form fields", () => {
-    render(<SignupPage />);
+  it("reports missing form names and marks inputs aria-invalid", async () => {
+    makeBasicForm(false); // remove email name attribute to simulate missing field
+    render(<SignupPageClient formId={formId} initialDraft={null} />);
 
-    // Basic auth fields
-    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(document.getElementById("password")).toBeInTheDocument();
-    expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
+    const form = document.getElementById(formId) as HTMLFormElement;
+    fireEvent.submit(form);
 
-    // Personal info fields
-    expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/last name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/phone number/i)).toBeInTheDocument();
+    // Expect the general validation/banner message (component uses a general error area).
+    await waitFor(() => {
+      const emailErrText =
+        document.getElementById("email-error")?.textContent ?? "";
+      expect(emailErrText).toMatch(/Missing input name/i);
+    });
 
-    // Address fields
-    expect(screen.getByLabelText(/street address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/address line 2/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/city/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/state\/territory/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/postal code/i)).toBeInTheDocument();
-
-    // Submit button
-    expect(
-      screen.getByRole("button", { name: /sign up/i }),
-    ).toBeInTheDocument();
+    // Ensure the email input indeed has no name attribute (the condition we simulated)
+    const emailInput = document.getElementById("email") as HTMLInputElement;
+    expect(emailInput.hasAttribute("name")).toBe(false);
+    expect(emailInput.getAttribute("aria-invalid")).toBe("true");
   });
 
-  it("shows required field indicators", () => {
-    render(<SignupPage />);
+  it("intercepts native submit and routes through validator (prevents native submit when invalid)", async () => {
+    makeBasicForm(true);
+    const nativeSubmitSpy = vi
+      .spyOn(HTMLFormElement.prototype, "submit")
+      .mockImplementation(() => {});
+    render(<SignupPageClient formId={formId} initialDraft={null} />);
 
-    // Check for required field asterisks
-    const requiredFields = screen.getAllByText("*");
-    expect(requiredFields.length).toBeGreaterThan(0);
+    (document.getElementById("username") as HTMLInputElement).value = ""; // required
+    (document.getElementById("email") as HTMLInputElement).value = ""; // required
 
-    // Check that optional field shows "(optional)"
-    expect(screen.getByText("(optional)")).toBeInTheDocument();
-  });
+    const form = document.getElementById(formId) as HTMLFormElement;
+    fireEvent.submit(form);
 
-  it("has proper input types and attributes", () => {
-    render(<SignupPage />);
+    await waitFor(() => {
+      expect(nativeSubmitSpy).not.toHaveBeenCalled();
+    });
 
-    // Check input types
-    expect(screen.getByLabelText(/email/i)).toHaveAttribute("type", "email");
-    expect(document.getElementById("password")).toHaveAttribute(
-      "type",
-      "password",
-    );
-    expect(screen.getByLabelText(/confirm password/i)).toHaveAttribute(
-      "type",
-      "password",
-    );
-    expect(screen.getByLabelText(/phone number/i)).toHaveAttribute(
-      "type",
-      "tel",
-    );
-
-    // Check placeholders
-    expect(
-      screen.getByPlaceholderText(/\(555\) 123-4567 or 555-123-4567/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByPlaceholderText(/12345 or 12345-6789/),
-    ).toBeInTheDocument();
+    nativeSubmitSpy.mockRestore();
   });
 });

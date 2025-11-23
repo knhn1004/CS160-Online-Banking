@@ -1,641 +1,294 @@
-"use client";
-
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useForm } from "@tanstack/react-form";
-import { createClient } from "@/utils/supabase/client";
+// This is the parent server component for the signup page.
+import SignupPageClient from "./SignupPageClient";
+import { signupAction } from "../actions/signupAction";
+import { createClient } from "@/utils/supabase/server"; //
+import { redirect } from "next/navigation";
+import type { z } from "zod";
+import { SignupSchema, USStateTerritorySchema } from "../../lib/schemas/user";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { SignupSchema, USStateTerritorySchema } from "@/lib/schemas/user";
-import { z } from "zod";
+import type { USStateTerritory } from "../../lib/schemas/user";
 
-// Get US states/territories from schema
-const US_STATES = USStateTerritorySchema.options;
+const PrefillSchema = SignupSchema.omit({
+  password: true,
+  confirmPassword: true,
+});
 
-export default function SignupPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+// Every time a user tries to access the signup page, this component will run.
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: { error?: string };
+}) {
+  // await searchParams before using properties (Next.js requires this)
+  const sp = await searchParams;
+  const errorMessage = sp?.error ? decodeURIComponent(String(sp.error)) : null;
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        router.push("/dashboard");
+  // Create a temporary, server-side Supabase client bound to the user's current request.
+  // This will read HttpOnly cookies because we exported from server.ts!
+  const supabase = await createClient();
+  // Check for an existing session by seeing if the current user can be resolved using cookies.
+  const { data } = await supabase.auth.getUser();
+  const rawUser =
+    (data as unknown as { user?: unknown } | undefined)?.user ?? null;
+
+  // We want to see if the user metadata can be recovered first before giving them a new form.
+  let initialDraft: z.infer<typeof PrefillSchema> | null = null; // New user -> no stored information.
+  if (rawUser && typeof rawUser === "object") {
+    const userMeta = (rawUser as { user_metadata?: unknown }).user_metadata;
+    const candidate =
+      (userMeta as { profileDraft?: unknown } | undefined)?.profileDraft ??
+      null;
+    // Still need to perform basic validation on user metadata.
+    if (candidate != null && typeof candidate === "object") {
+      const parsed = PrefillSchema.safeParse(candidate);
+      if (parsed.success) {
+        initialDraft = parsed.data;
+      } else {
+        initialDraft = null;
       }
-    };
-    checkAuth();
-  }, [router]);
+    }
+  }
 
-  const form = useForm({
-    defaultValues: {
-      username: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-      firstName: "",
-      lastName: "",
-      phoneNumber: "",
-      streetAddress: "",
-      addressLine2: "",
-      city: "",
-      stateOrTerritory: "" as
-        | ""
-        | "AL"
-        | "AK"
-        | "AZ"
-        | "AR"
-        | "CA"
-        | "CO"
-        | "CT"
-        | "DE"
-        | "DC"
-        | "FL"
-        | "GA"
-        | "HI"
-        | "ID"
-        | "IL"
-        | "IN"
-        | "IA"
-        | "KS"
-        | "KY"
-        | "LA"
-        | "ME"
-        | "MD"
-        | "MA"
-        | "MI"
-        | "MN"
-        | "MS"
-        | "MO"
-        | "MT"
-        | "NE"
-        | "NV"
-        | "NH"
-        | "NJ"
-        | "NM"
-        | "NY"
-        | "NC"
-        | "ND"
-        | "OH"
-        | "OK"
-        | "OR"
-        | "PA"
-        | "RI"
-        | "SC"
-        | "SD"
-        | "TN"
-        | "TX"
-        | "UT"
-        | "VT"
-        | "VA"
-        | "WA"
-        | "WV"
-        | "WI"
-        | "WY"
-        | "PR"
-        | "GU"
-        | "VI"
-        | "AS"
-        | "MP",
-      postalCode: "",
-    },
-    onSubmit: async ({ value }) => {
-      // Validate with Zod
-      const result = SignupSchema.safeParse(value);
-      if (!result.success) {
-        const firstError = result.error.issues[0];
-        setError(firstError?.message || "Validation failed");
-        return;
-      }
+  // If the user is already signed in and there's no draft to prefill, we should redirect them to the dashboard.
+  if (rawUser && !initialDraft) redirect("/dashboard");
 
-      setLoading(true);
-      setError(null);
+  const STATE_OPTIONS = (USStateTerritorySchema.options ??
+    []) as readonly USStateTerritory[];
 
-      try {
-        const supabase = createClient();
-
-        // Create auth user with Supabase
-        const { error: authError } = await supabase.auth.signUp({
-          email: value.email,
-          password: value.password,
-        });
-
-        if (authError) {
-          console.log(authError.message);
-          setError(authError.message);
-          return;
-        }
-
-        // POST user to database
-        // Strip non-digit characters from phone number before sending
-        const cleanPhoneNumber = value.phoneNumber.replace(/\D/g, "");
-        const response = await fetch("/api/users/onboard", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username: value.username,
-            first_name: value.firstName,
-            last_name: value.lastName,
-            email: value.email,
-            phone_number: `+1${cleanPhoneNumber}`,
-            street_address: value.streetAddress,
-            address_line_2: value.addressLine2 || null,
-            city: value.city,
-            state_or_territory: value.stateOrTerritory,
-            postal_code: value.postalCode,
-            country: "USA",
-            role: "customer",
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = (await response.json()) as { message?: string };
-          throw new Error(errorData.message || "Failed to create user profile");
-        }
-
-        // Redirect on success
-        window.location.assign("/dashboard");
-      } catch (error) {
-        setError(error instanceof Error ? error.message : "An error occurred");
-      } finally {
-        setLoading(false);
-      }
-    },
-  });
-
+  // Server rendering!
   return (
-    <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          form.handleSubmit();
-        }}
-        className="w-full max-w-sm space-y-4"
-      >
-        <form.Field
-          name="username"
-          validators={{
-            onChange: ({ value }) => {
-              const result = z
-                .string()
-                .min(3, "Username must be at least 3 characters")
-                .safeParse(value);
-              return result.success
-                ? undefined
-                : result.error.issues[0]?.message;
-            },
-          }}
-        >
-          {(field) => (
-            <div className="space-y-1">
-              <label htmlFor="username" className="text-sm font-medium">
-                Username
-                <span className="text-destructive text-xs ml-1">*</span>
-              </label>
-              <Input
-                id="username"
-                type="text"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                required
-              />
-              {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {field.state.meta.errors[0]}
-                </p>
-              )}
-            </div>
-          )}
-        </form.Field>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+      <div className="w-full max-w-md mx-auto px-6 py-12 bg-white rounded-lg shadow-md">
+        <h1 className="text-2xl font-semibold mb-6 text-center">Sign up</h1>
 
-        <form.Field
-          name="email"
-          validators={{
-            onChange: ({ value }) => {
-              const result = z
-                .string()
-                .email("Invalid email address")
-                .safeParse(value);
-              return result.success
-                ? undefined
-                : result.error.issues[0]?.message;
-            },
-          }}
-        >
-          {(field) => (
-            <div className="space-y-1">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-                <span className="text-destructive text-xs ml-1">*</span>
-              </label>
-              <Input
-                id="email"
-                type="email"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                required
-              />
-              {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {field.state.meta.errors[0]}
-                </p>
-              )}
-            </div>
-          )}
-        </form.Field>
+        {errorMessage && (
+          <div className="mb-4 text-sm text-destructive">{errorMessage}</div>
+        )}
 
-        <form.Field
-          name="password"
-          validators={{
-            onChange: ({ value }) => {
-              const result = z
-                .string()
-                .min(8, "Password must be at least 8 characters")
-                .regex(
-                  /[A-Z]/,
-                  "Password must contain at least one uppercase letter",
-                )
-                .regex(
-                  /[a-z]/,
-                  "Password must contain at least one lowercase letter",
-                )
-                .regex(/[0-9]/, "Password must contain at least one number")
-                .safeParse(value);
-              return result.success
-                ? undefined
-                : result.error.issues[0]?.message;
-            },
-          }}
+        <form
+          id="signup-form"
+          action={signupAction}
+          className="w-full max-w-sm space-y-4"
         >
-          {(field) => (
+          {/* Username */}
+          <div className="space-y-1">
+            <label htmlFor="username" className="text-sm font-medium">
+              Username <span className="text-destructive text-xs ml-1">*</span>
+            </label>
+            <Input
+              id="username"
+              name="username"
+              type="text"
+              defaultValue={initialDraft?.username ?? ""}
+              aria-describedby="username-error"
+              required
+            />
+            <p id="username-error" className="text-sm text-destructive mt-1" />
+          </div>
+
+          {/* Email */}
+          <div className="space-y-1">
+            <label htmlFor="email" className="text-sm font-medium">
+              Email <span className="text-destructive text-xs ml-1">*</span>
+            </label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              defaultValue={initialDraft?.email ?? ""}
+              aria-describedby="email-error"
+              required
+            />
+            <p id="email-error" className="text-sm text-destructive mt-1" />
+          </div>
+
+          {/* Password / Confirm */}
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="password" className="text-sm font-medium">
                 Password
-                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="password"
+                name="password"
                 type="password"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
+                aria-describedby="password-error"
                 required
               />
-              {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {field.state.meta.errors[0]}
-                </p>
-              )}
+              <p
+                id="password-error"
+                className="text-sm text-destructive mt-1"
+              />
             </div>
-          )}
-        </form.Field>
-
-        <form.Field
-          name="confirmPassword"
-          validators={{
-            onChangeListenTo: ["password"],
-            onChange: ({ value, fieldApi }) => {
-              const password = fieldApi.form.getFieldValue("password");
-              if (value !== password) {
-                return "Passwords do not match";
-              }
-              return undefined;
-            },
-          }}
-        >
-          {(field) => (
             <div className="space-y-1">
               <label htmlFor="confirmPassword" className="text-sm font-medium">
                 Confirm Password
-                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="confirmPassword"
+                name="confirmPassword"
                 type="password"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
+                aria-describedby="confirmPassword-error"
                 required
               />
-              {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {field.state.meta.errors[0]}
-                </p>
-              )}
+              <p
+                id="confirmPassword-error"
+                className="text-sm text-destructive mt-1"
+              />
             </div>
-          )}
-        </form.Field>
+          </div>
 
-        <form.Field
-          name="firstName"
-          validators={{
-            onChange: ({ value }) => {
-              const result = z
-                .string()
-                .min(1, "First name is required")
-                .safeParse(value);
-              return result.success
-                ? undefined
-                : result.error.issues[0]?.message;
-            },
-          }}
-        >
-          {(field) => (
+          {/* First / Last */}
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="firstName" className="text-sm font-medium">
-                First Name
-                <span className="text-destructive text-xs ml-1">*</span>
+                First name
               </label>
               <Input
                 id="firstName"
+                name="firstName"
                 type="text"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                required
+                defaultValue={initialDraft?.firstName ?? ""}
+                aria-describedby="firstName-error"
               />
-              {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {field.state.meta.errors[0]}
-                </p>
-              )}
+              <p
+                id="firstName-error"
+                className="text-sm text-destructive mt-1"
+              />
             </div>
-          )}
-        </form.Field>
-
-        <form.Field
-          name="lastName"
-          validators={{
-            onChange: ({ value }) => {
-              const result = z
-                .string()
-                .min(1, "Last name is required")
-                .safeParse(value);
-              return result.success
-                ? undefined
-                : result.error.issues[0]?.message;
-            },
-          }}
-        >
-          {(field) => (
             <div className="space-y-1">
               <label htmlFor="lastName" className="text-sm font-medium">
-                Last Name
-                <span className="text-destructive text-xs ml-1">*</span>
+                Last name
               </label>
               <Input
                 id="lastName"
+                name="lastName"
                 type="text"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                required
+                defaultValue={initialDraft?.lastName ?? ""}
+                aria-describedby="lastName-error"
               />
-              {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {field.state.meta.errors[0]}
-                </p>
-              )}
-            </div>
-          )}
-        </form.Field>
-
-        <form.Field
-          name="phoneNumber"
-          validators={{
-            onChange: ({ value }) => {
-              const result = z
-                .string()
-                .min(10, "Phone number must contain at least 10 digits")
-                .regex(/\d/, "Phone number must contain digits")
-                .safeParse(value);
-              return result.success
-                ? undefined
-                : result.error.issues[0]?.message;
-            },
-          }}
-        >
-          {(field) => (
-            <div className="space-y-1">
-              <label htmlFor="phoneNumber" className="text-sm font-medium">
-                Phone Number
-                <span className="text-destructive text-xs ml-1">*</span>
-              </label>
-              <Input
-                id="phoneNumber"
-                type="tel"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                required
-                placeholder="(555) 123-4567 or 555-123-4567"
-              />
-              {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {field.state.meta.errors[0]}
-                </p>
-              )}
-            </div>
-          )}
-        </form.Field>
-
-        <form.Field
-          name="streetAddress"
-          validators={{
-            onChange: ({ value }) => {
-              const result = z
-                .string()
-                .min(1, "Street address is required")
-                .safeParse(value);
-              return result.success
-                ? undefined
-                : result.error.issues[0]?.message;
-            },
-          }}
-        >
-          {(field) => (
-            <div className="space-y-1">
-              <label htmlFor="streetAddress" className="text-sm font-medium">
-                Street Address
-                <span className="text-destructive text-xs ml-1">*</span>
-              </label>
-              <Input
-                id="streetAddress"
-                type="text"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                required
-              />
-              {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {field.state.meta.errors[0]}
-                </p>
-              )}
-            </div>
-          )}
-        </form.Field>
-
-        <form.Field name="addressLine2">
-          {(field) => (
-            <div className="space-y-1">
-              <label htmlFor="addressLine2" className="text-sm font-medium">
-                Address Line 2
-                <span className="text-gray-500 text-xs ml-1">(optional)</span>
-              </label>
-              <Input
-                id="addressLine2"
-                type="text"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
+              <p
+                id="lastName-error"
+                className="text-sm text-destructive mt-1"
               />
             </div>
-          )}
-        </form.Field>
+          </div>
 
-        <form.Field
-          name="city"
-          validators={{
-            onChange: ({ value }) => {
-              const result = z
-                .string()
-                .min(1, "City is required")
-                .safeParse(value);
-              return result.success
-                ? undefined
-                : result.error.issues[0]?.message;
-            },
-          }}
-        >
-          {(field) => (
+          {/* Phone */}
+          <div className="space-y-1">
+            <label htmlFor="phoneNumber" className="text-sm font-medium">
+              Phone number
+            </label>
+            <Input
+              id="phoneNumber"
+              name="phoneNumber"
+              type="tel"
+              defaultValue={initialDraft?.phoneNumber ?? ""}
+              aria-describedby="phoneNumber-error"
+            />
+            <p
+              id="phoneNumber-error"
+              className="text-sm text-destructive mt-1"
+            />
+          </div>
+
+          {/* Address */}
+          <div className="space-y-1">
+            <label htmlFor="streetAddress" className="text-sm font-medium">
+              Street address
+            </label>
+            <Input
+              id="streetAddress"
+              name="streetAddress"
+              type="text"
+              defaultValue={initialDraft?.streetAddress ?? ""}
+              aria-describedby="streetAddress-error"
+            />
+            <p
+              id="streetAddress-error"
+              className="text-sm text-destructive mt-1"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="addressLine2" className="text-sm font-medium">
+              Address line 2
+            </label>
+            <Input
+              id="addressLine2"
+              name="addressLine2"
+              type="text"
+              defaultValue={initialDraft?.addressLine2 ?? ""}
+              aria-describedby="addressLine2-error"
+            />
+            <p
+              id="addressLine2-error"
+              className="text-sm text-destructive mt-1"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="city" className="text-sm font-medium">
                 City
-                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <Input
                 id="city"
+                name="city"
                 type="text"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                required
+                defaultValue={initialDraft?.city ?? ""}
+                aria-describedby="city-error"
               />
-              {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {field.state.meta.errors[0]}
-                </p>
-              )}
+              <p id="city-error" className="text-sm text-destructive mt-1" />
             </div>
-          )}
-        </form.Field>
 
-        <form.Field
-          name="stateOrTerritory"
-          validators={{
-            onChange: ({ value }) => {
-              if (!value) {
-                return "State/Territory is required";
-              }
-              return undefined;
-            },
-          }}
-        >
-          {(field) => (
             <div className="space-y-1">
               <label htmlFor="stateOrTerritory" className="text-sm font-medium">
                 State/Territory
-                <span className="text-destructive text-xs ml-1">*</span>
               </label>
               <select
                 id="stateOrTerritory"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) =>
-                  field.handleChange(e.target.value as typeof field.state.value)
-                }
+                name="stateOrTerritory"
+                defaultValue={initialDraft?.stateOrTerritory ?? ""}
                 required
-                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-md border px-3 py-2"
+                aria-describedby="stateOrTerritory-error"
               >
-                <option value="">Select State/Territory</option>
-                {US_STATES.map((state) => (
-                  <option key={state} value={state}>
-                    {state}
+                <option value="">Select a state</option>
+                {STATE_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
                   </option>
                 ))}
               </select>
-              {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {field.state.meta.errors[0]}
-                </p>
-              )}
-            </div>
-          )}
-        </form.Field>
-
-        <form.Field
-          name="postalCode"
-          validators={{
-            onChange: ({ value }) => {
-              const result = z
-                .string()
-                .regex(
-                  /^\d{5}(-?\d{4})?$/,
-                  "Postal code must be 5 digits or ZIP+4 format",
-                )
-                .safeParse(value);
-              return result.success
-                ? undefined
-                : result.error.issues[0]?.message;
-            },
-          }}
-        >
-          {(field) => (
-            <div className="space-y-1">
-              <label htmlFor="postalCode" className="text-sm font-medium">
-                Postal Code
-                <span className="text-destructive text-xs ml-1">*</span>
-              </label>
-              <Input
-                id="postalCode"
-                type="text"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                required
-                placeholder="12345 or 12345-6789"
-                maxLength={10}
+              <p
+                id="stateOrTerritory-error"
+                className="text-sm text-destructive mt-1"
               />
-              {field.state.meta.errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {field.state.meta.errors[0]}
-                </p>
-              )}
             </div>
-          )}
-        </form.Field>
+          </div>
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button type="submit" disabled={loading} className="w-full">
-          {loading ? "Signing up..." : "Sign up"}
-        </Button>
-        <p className="text-center text-sm text-muted-foreground">
-          Already have an account?{" "}
-          <a href="/login" className="text-primary hover:underline font-medium">
-            Log in
-          </a>
-        </p>
-      </form>
+          <div className="space-y-1">
+            <label htmlFor="postalCode" className="text-sm font-medium">
+              Postal code
+            </label>
+            <Input
+              id="postalCode"
+              name="postalCode"
+              type="text"
+              defaultValue={initialDraft?.postalCode ?? ""}
+              aria-describedby="postalCode-error"
+            />
+            <p
+              id="postalCode-error"
+              className="text-sm text-destructive mt-1"
+            />
+          </div>
+
+          {/* client-side pre-submit validator + submit button */}
+          <SignupPageClient formId="signup-form" initialDraft={initialDraft} />
+        </form>
+      </div>
     </div>
   );
 }
