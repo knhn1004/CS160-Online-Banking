@@ -140,6 +140,14 @@ export function BillPay() {
         const frequency =
           frequencyPreset === "custom" ? customFrequency : frequencyPreset;
 
+        // Convert datetime-local format to ISO datetime string
+        const startTimeISO = value.start_time
+          ? new Date(value.start_time).toISOString()
+          : "";
+        const endTimeISO = value.end_time
+          ? new Date(value.end_time).toISOString()
+          : undefined;
+
         const requestBody: {
           source_account_id: number;
           payee_id?: number;
@@ -152,7 +160,7 @@ export function BillPay() {
           source_account_id: value.source_account_id,
           amount: value.amount,
           frequency,
-          start_time: value.start_time,
+          start_time: startTimeISO,
         };
 
         if (value.payee_id) {
@@ -161,8 +169,8 @@ export function BillPay() {
           requestBody.payee = value.payee;
         }
 
-        if (value.end_time) {
-          requestBody.end_time = value.end_time;
+        if (endTimeISO) {
+          requestBody.end_time = endTimeISO;
         }
 
         const response = await fetch("/api/billpay/rules", {
@@ -328,8 +336,17 @@ export function BillPay() {
     }
 
     form.setFieldValue("frequency", rule.frequency);
-    form.setFieldValue("start_time", rule.start_time);
-    form.setFieldValue("end_time", rule.end_time || "");
+    // Convert ISO datetime to datetime-local format
+    form.setFieldValue(
+      "start_time",
+      rule.start_time
+        ? new Date(rule.start_time).toISOString().slice(0, 16)
+        : "",
+    );
+    form.setFieldValue(
+      "end_time",
+      rule.end_time ? new Date(rule.end_time).toISOString().slice(0, 16) : "",
+    );
     setSelectedPayeeId(rule.payee_id);
     setFormState("filling");
   };
@@ -377,10 +394,14 @@ export function BillPay() {
         updateData.frequency = frequency;
       }
       if (value.start_time) {
-        updateData.start_time = value.start_time;
+        // Convert datetime-local format to ISO datetime string
+        updateData.start_time = new Date(value.start_time).toISOString();
       }
       if (value.end_time !== undefined) {
-        updateData.end_time = value.end_time || null;
+        // Convert datetime-local format to ISO datetime string
+        updateData.end_time = value.end_time
+          ? new Date(value.end_time).toISOString()
+          : null;
       }
 
       const response = await fetch(`/api/billpay/rules/${editingRuleId}`, {
@@ -719,7 +740,33 @@ export function BillPay() {
                     )}
                   </form.Field>
 
-                  <form.Field name="amount">
+                  <form.Field
+                    name="amount"
+                    validators={{
+                      onChange: ({ value }) => {
+                        if (!value || value.trim() === "")
+                          return "Amount is required";
+                        const numValue = parseFloat(value);
+                        if (isNaN(numValue) || numValue <= 0)
+                          return "Amount must be greater than $0.00";
+                        if (numValue < 0.01)
+                          return "Amount must be at least $0.01";
+                        if (numValue > 9999999.99)
+                          return "Amount cannot exceed $9,999,999.99";
+
+                        // Check if amount exceeds source account balance
+                        const sourceAccount = accounts.find(
+                          (acc) =>
+                            acc.id === form.getFieldValue("source_account_id"),
+                        );
+                        if (sourceAccount && numValue > sourceAccount.balance) {
+                          return "Insufficient funds";
+                        }
+
+                        return undefined;
+                      },
+                    }}
+                  >
                     {(field) => (
                       <div className="space-y-2">
                         <label htmlFor="amount" className="text-sm font-medium">
@@ -1029,6 +1076,15 @@ export function BillPay() {
                   if (numValue < 0.01) return "Amount must be at least $0.01";
                   if (numValue > 9999999.99)
                     return "Amount cannot exceed $9,999,999.99";
+
+                  // Check if amount exceeds source account balance
+                  const sourceAccount = accounts.find(
+                    (acc) => acc.id === form.getFieldValue("source_account_id"),
+                  );
+                  if (sourceAccount && numValue > sourceAccount.balance) {
+                    return "Insufficient funds";
+                  }
+
                   return undefined;
                 },
               }}
@@ -1173,27 +1229,33 @@ export function BillPay() {
             <form.Field name="source_account_id">
               {({ state: sourceState }) => (
                 <form.Field name="amount">
-                  {({ state: amountState }) => {
-                    const isDisabled =
-                      !sourceState.value ||
-                      sourceState.value === 0 ||
-                      !selectedPayeeId ||
-                      !amountState.value ||
-                      amountState.value.trim() === "" ||
-                      parseFloat(amountState.value) <= 0 ||
-                      amountState.meta.errors.length > 0 ||
-                      !form.getFieldValue("start_time");
-                    return (
-                      <Button
-                        type="submit"
-                        disabled={isDisabled}
-                        className="w-full"
-                      >
-                        Create Auto Payment Rule
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    );
-                  }}
+                  {({ state: amountState }) => (
+                    <form.Field name="start_time">
+                      {({ state: startTimeState }) => {
+                        const isDisabled =
+                          !sourceState.value ||
+                          sourceState.value === 0 ||
+                          !selectedPayeeId ||
+                          !amountState.value ||
+                          amountState.value.trim() === "" ||
+                          parseFloat(amountState.value) <= 0 ||
+                          amountState.meta.errors.length > 0 ||
+                          !startTimeState.value ||
+                          startTimeState.value.trim() === "" ||
+                          startTimeState.meta.errors.length > 0;
+                        return (
+                          <Button
+                            type="submit"
+                            disabled={isDisabled}
+                            className="w-full"
+                          >
+                            Create Auto Payment Rule
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        );
+                      }}
+                    </form.Field>
+                  )}
                 </form.Field>
               )}
             </form.Field>
@@ -1292,11 +1354,23 @@ function BillPayeeForm({
     account_number: "",
     routing_number: "",
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = () => {
-    const result = BillPayPayeeSchema.safeParse(formData);
+    // Ensure state is always CA
+    const dataToSubmit = { ...formData, state_or_territory: "CA" };
+    const result = BillPayPayeeSchema.safeParse(dataToSubmit);
     if (result.success) {
+      setErrors({});
       onSubmit(result.data);
+    } else {
+      // Extract and format validation errors
+      const formattedErrors: Record<string, string> = {};
+      result.error.issues.forEach((issue) => {
+        const path = issue.path.join(".");
+        formattedErrors[path] = issue.message;
+      });
+      setErrors(formattedErrors);
     }
   };
 
@@ -1304,70 +1378,134 @@ function BillPayeeForm({
     <div className="space-y-3 rounded-lg border bg-card p-4">
       <h3 className="font-medium">Create New Payee</h3>
       <div className="space-y-3">
-        <Input
-          placeholder="Business Name"
-          value={formData.business_name}
-          onChange={(e) =>
-            setFormData({ ...formData, business_name: e.target.value })
-          }
-          required
-        />
-        <Input
-          type="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          required
-        />
-        <Input
-          placeholder="Phone"
-          value={formData.phone}
-          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-          required
-        />
-        <Input
-          placeholder="Street Address"
-          value={formData.street_address}
-          onChange={(e) =>
-            setFormData({ ...formData, street_address: e.target.value })
-          }
-          required
-        />
+        <div>
+          <Input
+            placeholder="Business Name"
+            value={formData.business_name}
+            onChange={(e) => {
+              setFormData({ ...formData, business_name: e.target.value });
+              if (errors.business_name)
+                setErrors({ ...errors, business_name: "" });
+            }}
+            required
+          />
+          {errors.business_name && (
+            <p className="text-sm text-warning mt-1">{errors.business_name}</p>
+          )}
+        </div>
+        <div>
+          <Input
+            type="email"
+            placeholder="Email"
+            value={formData.email}
+            onChange={(e) => {
+              setFormData({ ...formData, email: e.target.value });
+              if (errors.email) setErrors({ ...errors, email: "" });
+            }}
+            required
+          />
+          {errors.email && (
+            <p className="text-sm text-warning mt-1">{errors.email}</p>
+          )}
+        </div>
+        <div>
+          <Input
+            placeholder="Phone"
+            value={formData.phone}
+            onChange={(e) => {
+              setFormData({ ...formData, phone: e.target.value });
+              if (errors.phone) setErrors({ ...errors, phone: "" });
+            }}
+            required
+          />
+          {errors.phone && (
+            <p className="text-sm text-warning mt-1">{errors.phone}</p>
+          )}
+        </div>
+        <div>
+          <Input
+            placeholder="Street Address"
+            value={formData.street_address}
+            onChange={(e) => {
+              setFormData({ ...formData, street_address: e.target.value });
+              if (errors.street_address)
+                setErrors({ ...errors, street_address: "" });
+            }}
+            required
+          />
+          {errors.street_address && (
+            <p className="text-sm text-warning mt-1">{errors.street_address}</p>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <Input
             placeholder="City"
             value={formData.city}
-            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, city: e.target.value });
+              if (errors.city) setErrors({ ...errors, city: "" });
+            }}
             required
           />
           <Input
             placeholder="Postal Code"
             value={formData.postal_code}
-            onChange={(e) =>
-              setFormData({ ...formData, postal_code: e.target.value })
-            }
+            onChange={(e) => {
+              setFormData({ ...formData, postal_code: e.target.value });
+              if (errors.postal_code) setErrors({ ...errors, postal_code: "" });
+            }}
             required
           />
         </div>
+        {errors.postal_code && (
+          <p className="text-sm text-warning">{errors.postal_code}</p>
+        )}
         <div className="grid grid-cols-2 gap-2">
-          <Input
-            placeholder="Account Number"
-            value={formData.account_number}
-            onChange={(e) =>
-              setFormData({ ...formData, account_number: e.target.value })
-            }
-            required
-          />
-          <Input
-            placeholder="Routing Number"
-            value={formData.routing_number}
-            onChange={(e) =>
-              setFormData({ ...formData, routing_number: e.target.value })
-            }
-            required
-            maxLength={9}
-          />
+          <div>
+            <Input
+              placeholder="Account Number"
+              value={formData.account_number}
+              onChange={(e) => {
+                setFormData({ ...formData, account_number: e.target.value });
+                if (errors.account_number)
+                  setErrors({ ...errors, account_number: "" });
+              }}
+              required
+              maxLength={17}
+            />
+            {errors.account_number && (
+              <p className="text-sm text-warning mt-1">
+                {errors.account_number}
+              </p>
+            )}
+          </div>
+          <div>
+            <Input
+              placeholder="Routing Number"
+              value={formData.routing_number}
+              onChange={(e) => {
+                setFormData({ ...formData, routing_number: e.target.value });
+                if (errors.routing_number)
+                  setErrors({ ...errors, routing_number: "" });
+              }}
+              required
+              maxLength={9}
+            />
+            {errors.routing_number && (
+              <p className="text-sm text-warning mt-1">
+                {errors.routing_number}
+              </p>
+            )}
+          </div>
         </div>
+        {Object.keys(errors).length > 0 && (
+          <div
+            className="rounded-md bg-destructive/20 border border-destructive/50 p-3 text-sm text-destructive"
+            role="alert"
+          >
+            Please fix the errors above before submitting.
+          </div>
+        )}
         <div className="flex gap-2">
           <Button type="button" onClick={handleSubmit} className="flex-1">
             Create
