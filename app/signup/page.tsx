@@ -17,7 +17,7 @@ const PrefillSchema = SignupSchema.omit({
 export default async function Page({
   searchParams,
 }: {
-  searchParams?: { error?: string };
+  searchParams?: Promise<{ error?: string }>;
 }) {
   // await searchParams before using properties (Next.js requires this)
   const sp = await searchParams;
@@ -57,8 +57,8 @@ export default async function Page({
 
   // Server rendering!
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <div className="w-full max-w-md mx-auto px-6 py-12 bg-white rounded-lg shadow-md">
+    <div className="min-h-screen flex items-center justify-center bg-background p-6">
+      <div className="w-full max-w-md mx-auto px-6 py-12 bg-card text-card-foreground rounded-lg shadow-md border">
         <h1 className="text-2xl font-semibold mb-6 text-center">Sign up</h1>
 
         {errorMessage && (
@@ -72,7 +72,10 @@ export default async function Page({
         >
           {/* Username */}
           <div className="space-y-1">
-            <label htmlFor="username" className="text-sm font-medium">
+            <label
+              htmlFor="username"
+              className="text-sm font-medium text-foreground"
+            >
               Username <span className="text-destructive text-xs ml-1">*</span>
             </label>
             <Input
@@ -88,7 +91,10 @@ export default async function Page({
 
           {/* Email */}
           <div className="space-y-1">
-            <label htmlFor="email" className="text-sm font-medium">
+            <label
+              htmlFor="email"
+              className="text-sm font-medium text-foreground"
+            >
               Email <span className="text-destructive text-xs ml-1">*</span>
             </label>
             <Input
@@ -105,7 +111,10 @@ export default async function Page({
           {/* Password / Confirm */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label htmlFor="password" className="text-sm font-medium">
+              <label
+                htmlFor="password"
+                className="text-sm font-medium text-foreground"
+              >
                 Password
               </label>
               <Input
@@ -121,7 +130,10 @@ export default async function Page({
               />
             </div>
             <div className="space-y-1">
-              <label htmlFor="confirmPassword" className="text-sm font-medium">
+              <label
+                htmlFor="confirmPassword"
+                className="text-sm font-medium text-foreground"
+              >
                 Confirm Password
               </label>
               <Input
@@ -141,7 +153,10 @@ export default async function Page({
           {/* First / Last */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label htmlFor="firstName" className="text-sm font-medium">
+              <label
+                htmlFor="firstName"
+                className="text-sm font-medium text-foreground"
+              >
                 First name
               </label>
               <Input
@@ -157,7 +172,10 @@ export default async function Page({
               />
             </div>
             <div className="space-y-1">
-              <label htmlFor="lastName" className="text-sm font-medium">
+              <label
+                htmlFor="lastName"
+                className="text-sm font-medium text-foreground"
+              >
                 Last name
               </label>
               <Input
@@ -176,7 +194,10 @@ export default async function Page({
 
           {/* Phone */}
           <div className="space-y-1">
-            <label htmlFor="phoneNumber" className="text-sm font-medium">
+            <label
+              htmlFor="phoneNumber"
+              className="text-sm font-medium text-foreground"
+            >
               Phone number
             </label>
             <Input
@@ -194,7 +215,10 @@ export default async function Page({
 
           {/* Address */}
           <div className="space-y-1">
-            <label htmlFor="streetAddress" className="text-sm font-medium">
+            <label
+              htmlFor="streetAddress"
+              className="text-sm font-medium text-foreground"
+            >
               Street address
             </label>
             <Input
@@ -211,7 +235,10 @@ export default async function Page({
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="addressLine2" className="text-sm font-medium">
+            <label
+              htmlFor="addressLine2"
+              className="text-sm font-medium text-foreground"
+            >
               Address line 2
             </label>
             <Input
@@ -229,7 +256,10 @@ export default async function Page({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label htmlFor="city" className="text-sm font-medium">
+              <label
+                htmlFor="city"
+                className="text-sm font-medium text-foreground"
+              >
                 City
               </label>
               <Input
@@ -243,7 +273,10 @@ export default async function Page({
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="stateOrTerritory" className="text-sm font-medium">
+              <label
+                htmlFor="stateOrTerritory"
+                className="text-sm font-medium text-foreground"
+              >
                 State/Territory
               </label>
               <select
@@ -251,7 +284,7 @@ export default async function Page({
                 name="stateOrTerritory"
                 defaultValue={initialDraft?.stateOrTerritory ?? ""}
                 required
-                className="w-full rounded-md border px-3 py-2"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground"
                 aria-describedby="stateOrTerritory-error"
               >
                 <option value="">Select a state</option>
@@ -269,7 +302,10 @@ export default async function Page({
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="postalCode" className="text-sm font-medium">
+            <label
+              htmlFor="postalCode"
+              className="text-sm font-medium text-foreground"
+            >
               Postal code
             </label>
             <Input
