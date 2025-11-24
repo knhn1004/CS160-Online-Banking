@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
 import {
   Select,
   SelectContent,
@@ -141,6 +142,14 @@ export function ApiKeys() {
       return;
     }
 
+    // Validate that either "never expires" is checked or expiration date is provided
+    if (!neverExpires && !expiresAt) {
+      setError(
+        "Please either check 'Never expires' or provide an expiration date",
+      );
+      return;
+    }
+
     try {
       setGenerating(true);
       setError(null);
@@ -163,10 +172,10 @@ export function ApiKeys() {
         account_id: Number(selectedAccountId),
       };
 
-      if (!neverExpires && expiresAt) {
-        requestBody.expires_at = new Date(expiresAt).toISOString();
-      } else if (neverExpires) {
+      if (neverExpires) {
         requestBody.expires_at = null;
+      } else if (expiresAt) {
+        requestBody.expires_at = new Date(expiresAt).toISOString();
       }
 
       const response = await fetch("/api/api-keys/generate", {
@@ -344,18 +353,21 @@ export function ApiKeys() {
           {!neverExpires && (
             <div className="space-y-2">
               <Label htmlFor="expires-at">Expiration Date & Time</Label>
-              <Input
+              <DateTimePicker
                 id="expires-at"
-                type="datetime-local"
                 value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
+                onChange={(value) => setExpiresAt(value)}
+                min={new Date()}
+                placeholder="Select expiration date and time"
               />
             </div>
           )}
 
           <Button
             onClick={handleGenerate}
-            disabled={generating || !selectedAccountId}
+            disabled={
+              generating || !selectedAccountId || (!neverExpires && !expiresAt)
+            }
           >
             {generating ? "Generating..." : "Generate API Key"}
           </Button>

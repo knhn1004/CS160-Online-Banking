@@ -49,11 +49,30 @@ export function UserMenu() {
       .then((res: { data?: { user?: User | null } | null }) => {
         setFromUser((res.data && res.data.user) ?? null);
         setInitialized(true);
+      })
+      .catch((error: unknown) => {
+        // Handle auth errors (e.g., invalid refresh token)
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        if (
+          errorMessage.includes("Invalid Refresh Token") ||
+          errorMessage.includes("Refresh Token Not Found") ||
+          errorMessage.includes("refresh_token_not_found")
+        ) {
+          // Session is invalid, clear user state
+          setFromUser(null);
+        }
+        setInitialized(true);
       });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event: string, session: Session | null) => {
-        setFromUser(session?.user ?? null);
+      (event: string, session: Session | null) => {
+        // Handle SIGNED_OUT events (may occur due to refresh token failures)
+        if (event === "SIGNED_OUT" && !session) {
+          setFromUser(null);
+        } else {
+          setFromUser(session?.user ?? null);
+        }
       },
     );
 
