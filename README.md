@@ -18,7 +18,7 @@ pnpm install
 3. DB migrate + seed
 
 ```bash
-pnpm prisma migrate dev
+pnpm prisma migrate reset --skip-seed
 pnpm seed
 ```
 
