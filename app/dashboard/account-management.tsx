@@ -114,7 +114,7 @@ export function AccountManagement() {
             <div className="py-8 text-center text-muted-foreground">
               <p>You don&apos;t have any accounts yet.</p>
               <p className="mt-2 text-sm">
-                Click &quot;Create New Account&quot; to get started.
+                Please contact a manager to open an account for you.
               </p>
             </div>
           ) : (
