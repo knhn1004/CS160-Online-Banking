@@ -52,7 +52,7 @@ describe("POST /api/api-keys/generate", () => {
 
     const request = new Request("http://localhost/api/api-keys/generate", {
       method: "POST",
-      body: JSON.stringify({ account_id: 999 }),
+      body: JSON.stringify({ account_id: 999, expires_at: null }),
     });
 
     const response = await POST(request);
@@ -76,7 +76,7 @@ describe("POST /api/api-keys/generate", () => {
 
     const request = new Request("http://localhost/api/api-keys/generate", {
       method: "POST",
-      body: JSON.stringify({ account_id: 1 }),
+      body: JSON.stringify({ account_id: 1, expires_at: null }),
     });
 
     const response = await POST(request);
@@ -110,7 +110,7 @@ describe("POST /api/api-keys/generate", () => {
 
     const request = new Request("http://localhost/api/api-keys/generate", {
       method: "POST",
-      body: JSON.stringify({ account_id: 1 }),
+      body: JSON.stringify({ account_id: 1, expires_at: null }),
     });
 
     const response = await POST(request);
