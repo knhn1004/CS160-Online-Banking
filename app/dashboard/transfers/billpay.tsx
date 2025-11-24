@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
@@ -14,13 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  CheckCircle,
-  ArrowRight,
-  Calendar,
-  Trash2,
-  Pencil,
-} from "lucide-react";
+import { CheckCircle, ArrowRight, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -33,6 +27,8 @@ import { BillPayPayeeSchema } from "@/lib/schemas/billpay";
 import { InternalAccountResponse } from "@/lib/schemas/transfer";
 import { formatCurrency } from "@/lib/utils";
 import { CurrencyInputField } from "./currency-input";
+import type { BillPayPayee, BillPayRule } from "./billpay-types";
+import { BILLPAY_FREQUENCY_PRESETS } from "./billpay-constants";
 
 type FormState =
   | "idle"
@@ -64,35 +60,13 @@ interface BillPayFormData {
   end_time?: string;
 }
 
-interface BillPayPayee {
-  id: number;
-  business_name: string;
-  email: string;
-  phone: string;
-  account_number: string;
-  routing_number: string;
-}
-
-interface BillPayRule {
-  id: number;
-  source_internal_id: number;
-  payee_id: number;
-  amount: number;
-  frequency: string;
-  start_time: string;
-  end_time: string | null;
-}
-
-// Common frequency presets
-const FREQUENCY_PRESETS = [
-  { label: "Daily", value: "0 9 * * *" }, // Every day at 9 AM
-  { label: "Weekly (Monday)", value: "0 9 * * 1" },
-  { label: "Bi-weekly (Monday)", value: "0 9 */2 * *" },
-  { label: "Monthly (1st)", value: "0 9 1 * *" },
-  { label: "Custom", value: "custom" },
-];
-
-export function BillPay() {
+export function BillPay({
+  initialEditRuleId,
+  onEditRuleConsumed,
+}: {
+  initialEditRuleId?: number;
+  onEditRuleConsumed?: () => void;
+}) {
   const router = useRouter();
   const [formState, setFormState] = useState<FormState>("idle");
   const [accounts, setAccounts] = useState<InternalAccountResponse[]>([]);
@@ -111,6 +85,9 @@ export function BillPay() {
     amount: number;
     payee_name: string;
   } | null>(null);
+  const [consumedEditRuleId, setConsumedEditRuleId] = useState<number | null>(
+    null,
+  );
 
   const form = useForm({
     defaultValues: {
@@ -316,40 +293,68 @@ export function BillPay() {
     }
   };
 
-  const handleEditRule = (ruleId: number) => {
-    const rule = rules.find((r) => r.id === ruleId);
-    if (!rule) return;
+  const handleEditRule = useCallback(
+    (ruleId: number) => {
+      const rule = rules.find((r) => r.id === ruleId);
+      if (!rule) return;
 
-    setEditingRuleId(ruleId);
-    // Pre-populate form with existing rule data
-    form.setFieldValue("source_account_id", rule.source_internal_id);
-    form.setFieldValue("payee_id", rule.payee_id);
-    form.setFieldValue("amount", rule.amount.toString());
+      setEditingRuleId(ruleId);
+      // Pre-populate form with existing rule data
+      form.setFieldValue("source_account_id", rule.source_internal_id);
+      form.setFieldValue("payee_id", rule.payee_id);
+      form.setFieldValue("amount", rule.amount.toString());
 
-    // Set frequency preset if it matches
-    const preset = FREQUENCY_PRESETS.find((p) => p.value === rule.frequency);
-    if (preset) {
-      setFrequencyPreset(preset.value);
-    } else {
-      setFrequencyPreset("custom");
-      setCustomFrequency(rule.frequency);
+      // Set frequency preset if it matches
+      const preset = BILLPAY_FREQUENCY_PRESETS.find(
+        (p) => p.value === rule.frequency,
+      );
+      if (preset) {
+        setFrequencyPreset(preset.value);
+      } else {
+        setFrequencyPreset("custom");
+        setCustomFrequency(rule.frequency);
+      }
+
+      form.setFieldValue("frequency", rule.frequency);
+      // Convert ISO datetime to datetime-local format
+      form.setFieldValue(
+        "start_time",
+        rule.start_time
+          ? new Date(rule.start_time).toISOString().slice(0, 16)
+          : "",
+      );
+      form.setFieldValue(
+        "end_time",
+        rule.end_time ? new Date(rule.end_time).toISOString().slice(0, 16) : "",
+      );
+      setSelectedPayeeId(rule.payee_id);
+      setFormState("filling");
+    },
+    [rules, form],
+  );
+
+  useEffect(() => {
+    if (
+      !initialEditRuleId ||
+      consumedEditRuleId === initialEditRuleId ||
+      rules.length === 0
+    ) {
+      return;
     }
 
-    form.setFieldValue("frequency", rule.frequency);
-    // Convert ISO datetime to datetime-local format
-    form.setFieldValue(
-      "start_time",
-      rule.start_time
-        ? new Date(rule.start_time).toISOString().slice(0, 16)
-        : "",
-    );
-    form.setFieldValue(
-      "end_time",
-      rule.end_time ? new Date(rule.end_time).toISOString().slice(0, 16) : "",
-    );
-    setSelectedPayeeId(rule.payee_id);
-    setFormState("filling");
-  };
+    const ruleExists = rules.some((rule) => rule.id === initialEditRuleId);
+    if (ruleExists) {
+      handleEditRule(initialEditRuleId);
+      setConsumedEditRuleId(initialEditRuleId);
+      onEditRuleConsumed?.();
+    }
+  }, [
+    initialEditRuleId,
+    consumedEditRuleId,
+    rules,
+    handleEditRule,
+    onEditRuleConsumed,
+  ]);
 
   const handleUpdateRule = async () => {
     if (!editingRuleId) return;
@@ -441,44 +446,6 @@ export function BillPay() {
     setCustomFrequency("");
   };
 
-  const handleDeleteRule = async (ruleId: number) => {
-    if (!confirm("Are you sure you want to delete this bill pay rule?")) {
-      return;
-    }
-
-    try {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        throw new Error("Not authenticated");
-      }
-
-      const response = await fetch(`/api/billpay/rules/${ruleId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const data = (await response.json()) as {
-          error: string;
-          details?: unknown;
-        };
-        throw new Error(data.error || "Failed to delete billpay rule");
-      }
-
-      fetchRules(); // Refresh rules list
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete billpay rule",
-      );
-    }
-  };
-
   const handleCreatePayee = async (payeeData: unknown) => {
     try {
       const supabase = createClient();
@@ -507,21 +474,6 @@ export function BillPay() {
     } catch (err) {
       console.error("Failed to create payee:", err);
     }
-  };
-
-  const getFrequencyLabel = (frequency: string) => {
-    const preset = FREQUENCY_PRESETS.find((p) => p.value === frequency);
-    return preset ? preset.label : frequency;
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   if (loading) {
@@ -802,7 +754,7 @@ export function BillPay() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {FREQUENCY_PRESETS.filter(
+                        {BILLPAY_FREQUENCY_PRESETS.filter(
                           (p) => p.value !== "custom",
                         ).map((preset) => (
                           <SelectItem key={preset.value} value={preset.value}>
@@ -1119,7 +1071,7 @@ export function BillPay() {
                   onValueChange={(value) => {
                     setFrequencyPreset(value);
                     if (value !== "custom") {
-                      const preset = FREQUENCY_PRESETS.find(
+                      const preset = BILLPAY_FREQUENCY_PRESETS.find(
                         (p) => p.value === value,
                       );
                       if (preset && preset.value !== "custom") {
@@ -1132,7 +1084,7 @@ export function BillPay() {
                     <SelectValue placeholder="Select frequency" />
                   </SelectTrigger>
                   <SelectContent>
-                    {FREQUENCY_PRESETS.map((preset) => (
+                    {BILLPAY_FREQUENCY_PRESETS.map((preset) => (
                       <SelectItem
                         key={preset.value}
                         value={
@@ -1262,73 +1214,6 @@ export function BillPay() {
           </form>
         </CardContent>
       </Card>
-
-      {rules.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Auto Payment Rules</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {rules.map((rule) => {
-                const payee = payees.find((p) => p.id === rule.payee_id);
-                const sourceAccount = accounts.find(
-                  (a) => a.id === rule.source_internal_id,
-                );
-                return (
-                  <div
-                    key={rule.id}
-                    className="flex items-center justify-between p-4 rounded-lg border bg-muted/30"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold">
-                          {formatCurrency(rule.amount)}
-                        </p>
-                        <Badge variant="secondary">
-                          {getFrequencyLabel(rule.frequency)}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        To: {payee?.business_name || "Unknown Payee"}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        From:{" "}
-                        {sourceAccount
-                          ? `****${sourceAccount.account_number.slice(-4)}`
-                          : "Unknown"}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Starts: {formatDate(rule.start_time)}
-                        {rule.end_time &&
-                          ` • Ends: ${formatDate(rule.end_time)}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditRule(rule.id)}
-                        className="text-primary hover:text-primary"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteRule(rule.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

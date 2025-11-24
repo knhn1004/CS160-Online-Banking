@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InternalTransfer } from "./internal-transfer";
@@ -15,10 +15,57 @@ const TAB_NAMES: Record<string, string> = {
   billpay: "Bill Pay",
 };
 
-export default function TransfersPage() {
+function TransfersPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchString = searchParams.toString();
+  const tabParam = searchParams.get("tab");
+  const editRuleParam = searchParams.get("editRule");
+  const parsedEditRuleId = editRuleParam ? Number(editRuleParam) : undefined;
+  const editRuleId =
+    typeof parsedEditRuleId === "number" && !Number.isNaN(parsedEditRuleId)
+      ? parsedEditRuleId
+      : undefined;
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("internal");
+  const [activeTab, setActiveTab] = useState(() =>
+    tabParam && TAB_NAMES[tabParam] ? tabParam : "internal",
+  );
+
+  useEffect(() => {
+    if (tabParam && TAB_NAMES[tabParam] && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam, activeTab]);
+
+  const replaceWithParams = useCallback(
+    (params: URLSearchParams) => {
+      const query = params.toString();
+      router.replace(
+        query ? `/dashboard/transfers?${query}` : "/dashboard/transfers",
+      );
+    },
+    [router],
+  );
+
+  const handleTabChange = useCallback(
+    (value: string) => {
+      setActiveTab(value);
+      const params = new URLSearchParams(searchString);
+      if (value === "internal") {
+        params.delete("tab");
+      } else {
+        params.set("tab", value);
+      }
+      replaceWithParams(params);
+    },
+    [searchString, replaceWithParams],
+  );
+
+  const handleEditRuleConsumed = useCallback(() => {
+    const params = new URLSearchParams(searchString);
+    params.delete("editRule");
+    replaceWithParams(params);
+  }, [searchString, replaceWithParams]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -51,7 +98,7 @@ export default function TransfersPage() {
       <h1 className="mb-6 text-3xl font-bold">Money Transfers</h1>
       <Tabs
         value={activeTab}
-        onValueChange={setActiveTab}
+        onValueChange={handleTabChange}
         defaultValue="internal"
         className="w-full"
       >
@@ -67,9 +114,26 @@ export default function TransfersPage() {
           <ExternalTransfer />
         </TabsContent>
         <TabsContent value="billpay">
-          <BillPay />
+          <BillPay
+            initialEditRuleId={editRuleId}
+            onEditRuleConsumed={handleEditRuleConsumed}
+          />
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function TransfersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <p>Loading transfers…</p>
+        </div>
+      }
+    >
+      <TransfersPageInner />
+    </Suspense>
   );
 }
