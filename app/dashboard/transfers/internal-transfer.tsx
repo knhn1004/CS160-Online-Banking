@@ -20,6 +20,7 @@ import {
   InternalAccountResponse,
 } from "@/lib/schemas/transfer";
 import { formatCurrency } from "@/lib/utils";
+import { Breadcrumbs } from "./breadcrumbs";
 import { CurrencyInputField } from "./currency-input";
 
 type FormState =
@@ -250,6 +251,7 @@ export function InternalTransfer() {
   if (formState === "success" && successData) {
     return (
       <div className="space-y-6">
+        <Breadcrumbs currentPage="Internal Transfer" />
         <Card>
           <CardHeader>
             <CardTitle className="text-center text-success">
@@ -297,6 +299,9 @@ export function InternalTransfer() {
     const sourceAccount = accounts.find(
       (acc) => acc.id === form.getFieldValue("source_account_id"),
     );
+    // const destinationAccount = accounts.find(
+    //   (acc) => acc.id === form.getFieldValue("destination_account_id"),
+    // );
     const amount = parseFloat(form.getFieldValue("amount")) || 0;
 
     return (
@@ -366,6 +371,7 @@ export function InternalTransfer() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs currentPage="Internal Transfer" />
       <Card>
         <CardHeader>
           <CardTitle>Internal Transfer</CardTitle>
@@ -379,119 +385,121 @@ export function InternalTransfer() {
             }}
             className="space-y-6"
           >
-            <form.Field
-              name="source_account_id"
-              validators={{
-                onChange: ({ value }) => {
-                  const dest = form.getFieldValue("destination_account_id");
-
-                  if (!value) return "Source account is required";
-
-                  if (dest && value === dest)
-                    return "Destination account must be different from source account";
-
-                  return undefined;
-                },
-              }}
-            >
-              {(field) => (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="source_account_id"
-                    className="text-sm font-medium"
-                  >
-                    From Account
-                  </label>
-                  <Select
-                    value={
-                      field.state.value && field.state.value > 0
-                        ? field.state.value.toString()
-                        : ""
-                    }
-                    onValueChange={(value) => {
-                      field.handleChange(parseInt(value));
-                      // Trigger validation on destination field when source changes
-                      form.validateField("destination_account_id", "change");
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select source account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((account) => (
-                        <SelectItem
-                          key={account.id}
-                          value={account.id.toString()}
-                        >
-                          {`${account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1)} ****${account.account_number.slice(-4)} - ${formatCurrency(account.balance)}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {field.state.meta.errors.length > 0 && (
-                    <p className="text-sm text-warning">
-                      {field.state.meta.errors[0]}
-                    </p>
+            <form.Field name="destination_account_id">
+              {(destField) => (
+                <form.Field
+                  name="source_account_id"
+                  validators={{
+                    onChange: ({ value }) => {
+                      if (!value) return "Source account is required";
+                      return undefined;
+                    },
+                  }}
+                >
+                  {(field) => (
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="source_account_id"
+                        className="text-sm font-medium"
+                      >
+                        From Account
+                      </label>
+                      <Select
+                        value={
+                          field.state.value && field.state.value > 0
+                            ? field.state.value.toString()
+                            : ""
+                        }
+                        onValueChange={(value) => {
+                          const selectedId = parseInt(value);
+                          field.handleChange(selectedId);
+                          // Clear destination if same account selected
+                          if (selectedId === destField.state.value) {
+                            destField.handleChange(0);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select source account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((account) => (
+                            <SelectItem
+                              key={account.id}
+                              value={account.id.toString()}
+                            >
+                              {`${account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1)} ****${account.account_number.slice(-4)} - ${formatCurrency(account.balance)}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {field.state.meta.errors.length > 0 && (
+                        <p className="text-sm text-warning">
+                          {field.state.meta.errors[0]}
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
+                </form.Field>
               )}
             </form.Field>
 
-            <form.Field
-              name="destination_account_id"
-              validators={{
-                onChange: ({ value }) => {
-                  const source = form.getFieldValue("source_account_id");
-
-                  if (!value) return "Destination account is required";
-
-                  if (source && value === source)
-                    return "Destination account must be different from source account";
-
-                  return undefined;
-                },
-              }}
-            >
-              {(field) => (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="destination_account_id"
-                    className="text-sm font-medium"
-                  >
-                    To Account
-                  </label>
-                  <Select
-                    value={
-                      field.state.value && field.state.value > 0
-                        ? field.state.value.toString()
-                        : ""
-                    }
-                    onValueChange={(value) => {
-                      field.handleChange(parseInt(value));
-                      // Trigger validation on source field when destination changes
-                      form.validateField("source_account_id", "change");
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select destination account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((account) => (
-                        <SelectItem
-                          key={account.id}
-                          value={account.id.toString()}
-                        >
-                          {`${account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1)} ****${account.account_number.slice(-4)} - ${formatCurrency(account.balance)}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {field.state.meta.errors.length > 0 && (
-                    <p className="text-sm text-warning">
-                      {field.state.meta.errors[0]}
-                    </p>
+            <form.Field name="source_account_id">
+              {(sourceField) => (
+                <form.Field
+                  name="destination_account_id"
+                  validators={{
+                    onChange: ({ value }) => {
+                      if (!value) return "Destination account is required";
+                      return undefined;
+                    },
+                  }}
+                >
+                  {(field) => (
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="destination_account_id"
+                        className="text-sm font-medium"
+                      >
+                        To Account
+                      </label>
+                      <Select
+                        value={
+                          field.state.value && field.state.value > 0
+                            ? field.state.value.toString()
+                            : ""
+                        }
+                        onValueChange={(value) => {
+                          const selectedId = parseInt(value);
+                          field.handleChange(selectedId);
+                          // Clear source if same account selected
+                          if (selectedId === sourceField.state.value) {
+                            sourceField.handleChange(0);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select destination account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((account) => (
+                            <SelectItem
+                              key={account.id}
+                              value={account.id.toString()}
+                            >
+                              {`${account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1)} ****${account.account_number.slice(-4)} - ${formatCurrency(account.balance)}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {field.state.meta.errors.length > 0 && (
+                        <p className="text-sm text-warning">
+                          {field.state.meta.errors[0]}
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
+                </form.Field>
               )}
             </form.Field>
 
@@ -551,48 +559,37 @@ export function InternalTransfer() {
               </div>
             )}
 
-            <form.Subscribe
-              selector={(state) => [
-                state.values.source_account_id,
-                state.values.destination_account_id,
-                state.values.amount,
-                state.fieldMeta.source_account_id?.errors,
-                state.fieldMeta.destination_account_id?.errors,
-                state.fieldMeta.amount?.errors,
-              ]}
-            >
-              {(formValues) => {
-                const sourceValue = formValues[0] as number | null;
-                const destValue = formValues[1] as number | null;
-                const amountValue = formValues[2] as string;
-                const sourceErrors = (formValues[3] as string[]) || [];
-                const destErrors = (formValues[4] as string[]) || [];
-                const amountErrors = (formValues[5] as string[]) || [];
-
-                const isDisabled =
-                  !sourceValue ||
-                  !destValue ||
-                  !amountValue ||
-                  amountValue.trim() === "" ||
-                  parseFloat(amountValue) <= 0 ||
-                  sourceValue === destValue ||
-                  sourceErrors.length > 0 ||
-                  destErrors.length > 0 ||
-                  amountErrors.length > 0;
-
-                return (
-                  <Button
-                    type="button"
-                    onClick={handleContinue}
-                    disabled={isDisabled}
-                    className="w-full"
-                  >
-                    Continue
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                );
-              }}
-            </form.Subscribe>
+            <form.Field name="source_account_id">
+              {({ state: sourceState }) => (
+                <form.Field name="destination_account_id">
+                  {({ state: destState }) => (
+                    <form.Field name="amount">
+                      {({ state: amountState }) => {
+                        const isDisabled =
+                          !sourceState.value ||
+                          !destState.value ||
+                          !amountState.value ||
+                          amountState.value.trim() === "" ||
+                          parseFloat(amountState.value) <= 0 ||
+                          sourceState.value === destState.value ||
+                          amountState.meta.errors.length > 0;
+                        return (
+                          <Button
+                            type="button"
+                            onClick={handleContinue}
+                            disabled={isDisabled}
+                            className="w-full"
+                          >
+                            Continue
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        );
+                      }}
+                    </form.Field>
+                  )}
+                </form.Field>
+              )}
+            </form.Field>
           </form>
         </CardContent>
       </Card>
