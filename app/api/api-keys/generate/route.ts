@@ -9,7 +9,7 @@ export const revalidate = 0;
 
 const GenerateApiKeySchema = z.object({
   account_id: z.number().int().positive(),
-  expires_at: z.string().datetime().nullable().optional(),
+  expires_at: z.union([z.string().datetime(), z.null()]),
 });
 
 /**
@@ -45,6 +45,14 @@ export async function POST(request: Request) {
     }
 
     const { account_id, expires_at } = parseResult.data;
+
+    // Validate that expires_at is provided (either a date string or null)
+    if (expires_at === undefined) {
+      return json(400, {
+        error:
+          "expires_at is required. Provide a datetime string or null for never-expiring keys",
+      });
+    }
 
     const prisma = getPrisma();
 

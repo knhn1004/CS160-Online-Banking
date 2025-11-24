@@ -99,6 +99,16 @@ export default function ApiKeysScreen() {
       return;
     }
 
+    // Validate that either "never expires" is checked or expiration date is provided
+    if (!neverExpires && !expiresAt) {
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "Please either check 'Never expires' or provide an expiration date",
+      });
+      return;
+    }
+
     try {
       setGenerating(true);
 
@@ -109,10 +119,10 @@ export default function ApiKeysScreen() {
         account_id: selectedAccountId,
       };
 
-      if (!neverExpires && expiresAt) {
-        requestBody.expires_at = new Date(expiresAt).toISOString();
-      } else if (neverExpires) {
+      if (neverExpires) {
         requestBody.expires_at = null;
+      } else if (expiresAt) {
+        requestBody.expires_at = new Date(expiresAt).toISOString();
       }
 
       const data = await api.generateApiKey(requestBody);
@@ -284,11 +294,16 @@ export default function ApiKeysScreen() {
                 styles.submitButton,
                 {
                   backgroundColor: colors.primary,
-                  opacity: generating ? 0.6 : 1,
+                  opacity:
+                    generating || !selectedAccountId || (!neverExpires && !expiresAt)
+                      ? 0.6
+                      : 1,
                 },
               ]}
               onPress={handleGenerate}
-              disabled={generating || !selectedAccountId}
+              disabled={
+                generating || !selectedAccountId || (!neverExpires && !expiresAt)
+              }
             >
               {generating ? (
                 <ActivityIndicator color={colors.primaryForeground} />
