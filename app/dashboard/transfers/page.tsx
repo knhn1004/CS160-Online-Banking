@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,7 +15,7 @@ const TAB_NAMES: Record<string, string> = {
   billpay: "Bill Pay",
 };
 
-export default function TransfersPage() {
+function TransfersPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchString = searchParams.toString();
@@ -121,5 +121,19 @@ export default function TransfersPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function TransfersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <p>Loading transfers…</p>
+        </div>
+      }
+    >
+      <TransfersPageInner />
+    </Suspense>
   );
 }
