@@ -239,7 +239,7 @@ export async function POST(request: Request) {
         return json(200, {
           status: "Deposit already processed (idempotency key found)",
           transaction_id: existing.id,
-          amount: Math.round(Number(amount) * 100), // Convert dollars to cents
+          amount: Math.round(Number(amount)),
         });
       }
 
@@ -286,7 +286,7 @@ export async function POST(request: Request) {
       return json(200, {
         status: result.duplicate ? result.message : "Check deposit successful",
         transaction_id: result.transaction.id,
-        amount: Math.round(Number(amount) * 100), // Convert dollars to cents
+        amount: Math.round(Number(amount)),
         validation_result: {
           extracted_amount: extractedData.amount,
           routing_number: extractedData.routing_number,
