@@ -117,6 +117,24 @@ export function InternalTransferForm() {
     }
   }, [accounts.length, formState]);
 
+    useEffect(() => {
+    const source = form.getFieldValue("source_account_id");
+    const dest = form.getFieldValue("destination_account_id");
+
+    // If both accounts selected and same — show error
+    if (source && dest && source === dest) {
+      setError("Destination account must be different from source account");
+    } else {
+      // Clear error ONLY if the global error matches THIS specific rule
+      if (error === "Destination account must be different from source account") {
+        setError(null);
+      }
+    }
+  }, [
+    form.getFieldValue("source_account_id"),
+    form.getFieldValue("destination_account_id"),
+  ]);
+
   const handleContinue = () => {
     const sourceId = form.getFieldValue("source_account_id");
     const destId = form.getFieldValue("destination_account_id");
@@ -416,6 +434,9 @@ export function InternalTransferForm() {
         const sourceAccountId = formValues[0] as number | null;
         const destinationAccountId = formValues[1] as number | null;
         const amount = formValues[2] as string;
+
+
+
         const isFormValid =
           sourceAccountId &&
           destinationAccountId &&
@@ -445,7 +466,7 @@ export function InternalTransferForm() {
                     selectedAccountId={field.state.value}
                     onSelect={field.handleChange}
                     label="From Account"
-                    excludeAccountId={destinationAccountId || undefined}
+                    //excludeAccountId={destinationAccountId || undefined}
                     error={
                       field.state.meta.errors.length > 0
                         ? field.state.meta.errors[0]
@@ -475,7 +496,7 @@ export function InternalTransferForm() {
                     selectedAccountId={field.state.value}
                     onSelect={field.handleChange}
                     label="To Account"
-                    excludeAccountId={sourceAccountId || undefined}
+                    //excludeAccountId={sourceAccountId || undefined}
                     error={
                       field.state.meta.errors.length > 0
                         ? field.state.meta.errors[0]

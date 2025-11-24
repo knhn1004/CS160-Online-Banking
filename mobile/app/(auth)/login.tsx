@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+
 import {
   View,
   TextInput,
@@ -77,88 +79,91 @@ export default function LoginScreen() {
     }
     setLoading(false);
   };
+return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <ThemedView style={styles.content}>
+          <ThemedText type="title" style={styles.title}>
+            Sign In
+          </ThemedText>
 
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <ThemedView style={styles.content}>
-        <ThemedText type="title" style={styles.title}>
-          Sign In
-        </ThemedText>
+          <View style={styles.form}>
+            <View style={styles.inputGroup}>
+              <ThemedText style={styles.label}>Email</ThemedText>
+              <TextInput
+                style={[styles.input, errors.email && styles.inputError]}
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (errors.email) {
+                    setErrors({ ...errors, email: undefined });
+                  }
+                }}
+                placeholder="you@example.com"
+                placeholderTextColor="#999"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+              />
+              {errors.email && (
+                <ThemedText style={styles.errorText}>
+                  {errors.email}
+                </ThemedText>
+              )}
+            </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Email</ThemedText>
-            <TextInput
-              style={[styles.input, errors.email && styles.inputError]}
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (errors.email) {
-                  setErrors({ ...errors, email: undefined });
-                }
-              }}
-              placeholder="you@example.com"
-              placeholderTextColor="#999"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-            />
-            {errors.email && (
-              <ThemedText style={styles.errorText}>{errors.email}</ThemedText>
-            )}
-          </View>
+            <View style={styles.inputGroup}>
+              <ThemedText style={styles.label}>Password</ThemedText>
+              <TextInput
+                style={[styles.input, errors.password && styles.inputError]}
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (errors.password) {
+                    setErrors({ ...errors, password: undefined });
+                  }
+                }}
+                placeholder="Enter your password"
+                placeholderTextColor="#999"
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="password"
+              />
+              {errors.password && (
+                <ThemedText style={styles.errorText}>
+                  {errors.password}
+                </ThemedText>
+              )}
+            </View>
 
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Password</ThemedText>
-            <TextInput
-              style={[styles.input, errors.password && styles.inputError]}
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                if (errors.password) {
-                  setErrors({ ...errors, password: undefined });
-                }
-              }}
-              placeholder="Enter your password"
-              placeholderTextColor="#999"
-              secureTextEntry
-              autoCapitalize="none"
-              autoComplete="password"
-            />
-            {errors.password && (
-              <ThemedText style={styles.errorText}>
-                {errors.password}
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <ThemedText style={styles.buttonText}>Sign In</ThemedText>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => router.push("/(auth)/signup")}
+            >
+              <ThemedText style={styles.linkText}>
+                Don&apos;t have an account?{" "}
+                <ThemedText style={styles.linkTextBold}>Sign up</ThemedText>
               </ThemedText>
-            )}
-          </View>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <ThemedText style={styles.buttonText}>Sign In</ThemedText>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => router.push("/(auth)/signup")}
-          >
-            <ThemedText style={styles.linkText}>
-              Don&apos;t have an account?{" "}
-              <ThemedText style={styles.linkTextBold}>Sign up</ThemedText>
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
-      </ThemedView>
-    </ScrollView>
+          </View> {/* ← MISSING ONE — now fixed */}
+        </ThemedView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
