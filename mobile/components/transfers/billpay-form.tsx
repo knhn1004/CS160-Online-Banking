@@ -252,7 +252,7 @@ export function BillPayForm({ ruleId }: BillPayFormProps = {}) {
             form.setFieldValue("payee_id", rule.payee_id);
             form.setFieldValue(
               "amount",
-              (rule.amount / 100).toFixed(2), // Convert from cents to dollars
+              rule.amount.toFixed(2),
             );
             form.setFieldValue("frequency", rule.frequency);
             form.setFieldValue("start_time", rule.start_time);
@@ -390,7 +390,7 @@ export function BillPayForm({ ruleId }: BillPayFormProps = {}) {
                 </View>
                 <View style={styles.successAmountContainer}>
                   <ThemedText style={styles.successAmount}>
-                    {formatCurrency(successData.amount / 100)}
+                    {formatCurrency(successData.amount)}
                   </ThemedText>
                 </View>
                 <View style={styles.successDetails}>
