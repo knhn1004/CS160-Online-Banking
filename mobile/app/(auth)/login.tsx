@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -15,24 +15,16 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useAuth } from "@/contexts/auth-context";
 import { LoginSchema } from "@/lib/schemas/user";
-import { api } from "@/lib/api";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, user } = useAuth();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>(
     {},
   );
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (user) {
-      router.replace("/(tabs)/(home)" as any);
-    }
-  }, [user, router]);
 
   const validate = () => {
     const result = LoginSchema.safeParse({ email, password });
@@ -68,15 +60,8 @@ export default function LoginScreen() {
       return;
     }
 
-    // After sign in, try to onboard user if needed
-    try {
-      await api.getProfile();
-      router.replace("/(tabs)/(home)");
-    } catch {
-      // User might not be onboarded yet, but they're authenticated
-      // Redirect anyway - onboarding can happen later
-      router.replace("/(tabs)/(home)");
-    }
+    // Don't manually redirect here - let the layout's navigation logic handle it
+    // This prevents conflicts and infinite loops
     setLoading(false);
   };
 return (

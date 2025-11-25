@@ -8,6 +8,7 @@ import Toast from "react-native-toast-message";
 // Mock the API client
 jest.mock("@/lib/api", () => ({
   api: {
+    setSession: jest.fn(),
     getProfile: jest.fn(),
     updateProfile: jest.fn(),
   },

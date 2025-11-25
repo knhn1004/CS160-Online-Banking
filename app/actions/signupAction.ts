@@ -28,21 +28,22 @@ export async function signupAction(formData: FormData) {
   const normalizedEmail = String(p.email ?? "")
     .trim()
     .toLowerCase();
-  const normalizePhone = (v?: string) => {
-    if (!v) return null;
-    const digits = String(v).replace(/\D/g, "");
+
+  const normalizePhone = (phone?: string | null): string | null => {
+    if (!phone) return null;
+    const digits = phone.replace(/\D/g, "");
     if (digits.length === 10) return `+1${digits}`;
     if (digits.length === 11 && digits.startsWith("1"))
       return `+1${digits.slice(-10)}`;
     return null;
   };
-  const normalizedPhone = normalizePhone(p.phoneNumber ?? null);
+  const normalizedPhone = normalizePhone(p.phoneNumber);
 
-  // Conflict check (keeps behavior consistent with your API route)
+  // Check for existing user conflicts
   const conflict = await prisma.user.findFirst({
     where: {
       OR: [
-        { username: String(p.username ?? "") },
+        { username: p.username },
         { email: normalizedEmail },
         ...(normalizedPhone ? [{ phone_number: normalizedPhone }] : []),
       ],
@@ -51,17 +52,19 @@ export async function signupAction(formData: FormData) {
   });
 
   if (conflict) {
-    if (conflict.username === p.username)
+    if (conflict.username === p.username) {
       return redirect(`/signup?error=${encodeURIComponent("Username taken")}`);
-    if (conflict.email === normalizedEmail)
+    }
+    if (conflict.email === normalizedEmail) {
       return redirect(
         `/signup?error=${encodeURIComponent("Email already in use")}`,
       );
-    if (normalizedPhone && conflict.phone_number === normalizedPhone)
+    }
+    if (normalizedPhone && conflict.phone_number === normalizedPhone) {
       return redirect(
         `/signup?error=${encodeURIComponent("Phone number already in use")}`,
       );
-    return redirect(`/signup?error=${encodeURIComponent("Conflict")}`);
+    }
   }
 
   // Use anon/server cookie-aware client for public signup (no service-role key required here)
@@ -73,41 +76,28 @@ export async function signupAction(formData: FormData) {
       options: { data: { profileDraft: { ...p, password: undefined } } },
     });
 
-    console.debug("[signupAction] signUp result", { data, error });
-
     if (error) {
       if (/already.*exists/i.test(error.message ?? "")) {
         return redirect(
           `/signup?error=${encodeURIComponent("Auth user already exists")}`,
         );
       }
-      console.error("[signupAction] signUp failed", {
-        message: error.message,
-        error,
-      });
+      console.error("Signup failed:", error.message);
       return redirect(
         `/signup?error=${encodeURIComponent("Auth provider error")}`,
       );
     }
 
-    // If signUp created a session (no email confirm required) -> onboard now.
+    // If email confirmation is required, redirect to login
     if (!data?.session?.user) {
-      console.debug(
-        "[signupAction] signUp did not return a session (email confirm likely required)",
-        { data },
-      );
       return redirect(
         "/login?next=" + encodeURIComponent("/dashboard?onboard=1"),
       );
     }
 
-    const userId = data.session.user.id;
-    console.debug(
-      "[signupAction] session created; calling runOnboardingTasks",
-      { userId },
-    );
+    // Complete onboarding
     try {
-      await runOnboardingTasks(userId, {
+      await runOnboardingTasks(data.session.user.id, {
         username: p.username,
         firstName: p.firstName ?? null,
         lastName: p.lastName ?? null,
@@ -121,10 +111,7 @@ export async function signupAction(formData: FormData) {
         postalCode: p.postalCode ?? null,
       });
     } catch (onboardErr) {
-      // Log full error server-side for diagnostics, but show a safe message in the redirect.
-      console.error("[signupAction] onboarding failed", onboardErr);
-      // Redirect user to the onboarding page so they can finish/ retry onboarding,
-      // include a safe, generic message (don't leak internal error details).
+      console.error("Onboarding failed:", onboardErr);
       return redirect(
         `/dashboard?onboard_error=1&message=${encodeURIComponent("Failed to complete onboarding. Please try again.")}`,
       );

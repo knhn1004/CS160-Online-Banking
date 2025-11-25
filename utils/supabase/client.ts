@@ -26,55 +26,23 @@ export const createClient = (): ReturnType<typeof createBrowserClient> => {
     if (!globalThis.__SUPABASE_AUTH_ERROR_HANDLER_SETUP__) {
       globalThis.__SUPABASE_AUTH_ERROR_HANDLER_SETUP__ = true;
 
-      // Listen for auth state changes to handle refresh token errors
-      // When refresh token fails, Supabase will emit SIGNED_OUT event
+      // Handle auth state changes (including token refresh failures)
       client.auth.onAuthStateChange((event, session) => {
-        // Handle SIGNED_OUT events that may occur due to refresh token failures
-        if (event === "SIGNED_OUT" && !session) {
-          // Session was cleared (possibly due to invalid refresh token)
-          // Redirect to login if we're not already on auth pages
+        if (
+          (event === "SIGNED_OUT" ||
+            (event === "TOKEN_REFRESHED" && !session)) &&
+          typeof window !== "undefined"
+        ) {
+          const pathname = window.location.pathname;
           if (
-            typeof window !== "undefined" &&
-            !window.location.pathname.includes("/login") &&
-            !window.location.pathname.includes("/signup") &&
-            !window.location.pathname.includes("/auth")
+            !pathname.includes("/login") &&
+            !pathname.includes("/signup") &&
+            !pathname.includes("/auth")
           ) {
-            // Use replace instead of assign to avoid adding to history
             window.location.replace("/login");
           }
         }
       });
-
-      // Set up global error handler for unhandled auth errors
-      if (typeof window !== "undefined") {
-        window.addEventListener("unhandledrejection", (event) => {
-          const error = event.reason;
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          // Check if it's a refresh token error
-          if (
-            errorMessage.includes("Invalid Refresh Token") ||
-            errorMessage.includes("Refresh Token Not Found") ||
-            errorMessage.includes("refresh_token_not_found") ||
-            (error?.name === "AuthApiError" && errorMessage.includes("refresh"))
-          ) {
-            // Prevent the error from being logged to console
-            event.preventDefault();
-            // Clear the session
-            client.auth.signOut().catch(() => {
-              // Ignore errors during sign out
-            });
-            // Redirect to login if we're not already there
-            if (
-              !window.location.pathname.includes("/login") &&
-              !window.location.pathname.includes("/signup") &&
-              !window.location.pathname.includes("/auth")
-            ) {
-              window.location.replace("/login");
-            }
-          }
-        });
-      }
     }
   }
 

@@ -109,6 +109,37 @@ jest.mock('expo-constants', () => ({
   },
 }));
 
+// Mock API client
+jest.mock('@/lib/api', () => ({
+  api: {
+    setSession: jest.fn(),
+    setUnauthorizedHandler: jest.fn(),
+    getAccounts: jest.fn(),
+    getAccountBalances: jest.fn(),
+    createAccount: jest.fn(),
+    getTransactions: jest.fn(),
+    getProfile: jest.fn(),
+    updateProfile: jest.fn(),
+    onboardUser: jest.fn(),
+    getApiKeys: jest.fn(),
+    generateApiKey: jest.fn(),
+    revokeApiKey: jest.fn(),
+    makeApiKeyTransaction: jest.fn(),
+    transferInternal: jest.fn(),
+    transferExternal: jest.fn(),
+    lookupRecipient: jest.fn(),
+    getBillPayees: jest.fn(),
+    createBillPayee: jest.fn(),
+    getBillPayRules: jest.fn(),
+    createBillPayRule: jest.fn(),
+    updateBillPayRule: jest.fn(),
+    deleteBillPayRule: jest.fn(),
+    uploadCheckImage: jest.fn(),
+    depositCheck: jest.fn(),
+    getTransferHistory: jest.fn(),
+  },
+}));
+
 jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn().mockResolvedValue({
     status: 'granted',

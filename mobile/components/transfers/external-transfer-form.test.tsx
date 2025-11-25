@@ -18,6 +18,7 @@ jest.mock('react-native-toast-message', () => ({
 // Mock API
 jest.mock('@/lib/api', () => ({
   api: {
+    setSession: jest.fn(),
     lookupRecipient: jest.fn(),
     transferExternal: jest.fn(),
   },

@@ -5,7 +5,7 @@ import {
 } from "@react-navigation/native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -37,6 +37,7 @@ function RootLayoutNav() {
   const { user, loading, signOut } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const lastNavigationRef = useRef<string | null>(null);
 
   // Set up unauthorized handler to trigger logout on 401 errors
   useEffect(() => {
@@ -52,12 +53,21 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === "(auth)";
     const inTabsGroup = segments[0] === "(tabs)";
 
+    // Determine target route
+    let targetRoute: string | null = null;
     if (!user && !inAuthGroup) {
-      // Redirect to login if not authenticated
-      router.replace("/(auth)/login");
+      targetRoute = "/(auth)/login";
     } else if (user && !inTabsGroup) {
-      // Redirect to tabs if authenticated
-      router.replace("/(tabs)/(home)");
+      targetRoute = "/(tabs)/(home)";
+    }
+
+    // Only navigate if target is different from last navigation
+    if (targetRoute && targetRoute !== lastNavigationRef.current) {
+      lastNavigationRef.current = targetRoute;
+      router.replace(targetRoute);
+    } else if (!targetRoute) {
+      // Reset ref when no navigation is needed
+      lastNavigationRef.current = null;
     }
   }, [user, loading, segments, router]);
 

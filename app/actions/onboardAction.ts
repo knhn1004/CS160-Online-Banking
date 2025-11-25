@@ -7,47 +7,18 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 const prisma = getPrisma();
 
-// Type guard for Prisma P2002 duplicate-key error.
-function isPrismaP2002(
-  err: unknown,
-): err is { code: string; meta?: { target?: unknown } } {
-  if (typeof err !== "object" || err === null) return false;
-  const maybe = err as Record<string, unknown>;
-  return typeof maybe.code === "string" && maybe.code === "P2002";
-}
-
-function hasAdminUpdateUserById(obj: unknown): obj is {
-  auth: { admin: { updateUserById: (...args: unknown[]) => Promise<unknown> } };
-} {
-  if (typeof obj !== "object" || obj === null) return false;
-  const auth = (obj as Record<string, unknown>).auth;
-  if (typeof auth !== "object" || auth === null) return false;
-  const admin = (auth as Record<string, unknown>).admin;
-  if (typeof admin !== "object" || admin === null) return false;
+function isPrismaP2002(err: unknown): boolean {
   return (
-    typeof (admin as Record<string, unknown>).updateUserById === "function"
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code: unknown }).code === "P2002"
   );
 }
 
-function hasAuthUpdateUser(
-  obj: unknown,
-): obj is { auth: { updateUser: (...args: unknown[]) => Promise<unknown> } } {
-  if (typeof obj !== "object" || obj === null) return false;
-  const auth = (obj as Record<string, unknown>).auth;
-  if (typeof auth !== "object" || auth === null) return false;
-  return typeof (auth as Record<string, unknown>).updateUser === "function";
-}
-
 /**
- * runOnboardingTasks - create a DB user row (create-only, idempotent) and attempt
- * a best-effort admin metadata update in Supabase (server-only, service role).
- *
- * - Creates a user row if missing. If a concurrent process created the row the
- *   Prisma P2002 duplicate-key error is treated as success.
- * - Attempts to clear profileDraft / set onboarded flag in Supabase auth metadata
- *   using a service-role client when SUPABASE_SERVICE_ROLE_KEY is available.
- *
- * Throws on unexpected failures so callers (signupAction / onboardAction) can handle them.
+ * Creates a user row in the database (idempotent - handles concurrent creates).
+ * Optionally updates Supabase auth metadata if service role key is available.
  */
 export async function runOnboardingTasks(
   userId: string,
@@ -64,9 +35,7 @@ export async function runOnboardingTasks(
     postalCode?: string | null;
   },
 ) {
-  console.debug("[runOnboardingTasks] start", { userId, username: p.username });
-
-  // Create-only (race-safe via P2002 handling)
+  // Create user row (race-safe: P2002 duplicate key is treated as success)
   try {
     await prisma.user.create({
       data: {
@@ -85,67 +54,33 @@ export async function runOnboardingTasks(
         role: "customer",
       },
     });
-    console.debug("[runOnboardingTasks] created user row", { userId });
   } catch (err: unknown) {
+    // If another process created the row concurrently, treat as success
     if (isPrismaP2002(err)) {
       const target = (err as { meta?: { target?: unknown } }).meta?.target;
       if (Array.isArray(target) && target.includes("auth_user_id")) {
-        // Another process created the row concurrently — treat as success.
-        console.debug(
-          "[runOnboardingTasks] concurrent create detected; treating as success",
-          { userId },
-        );
-      } else {
-        console.error("[runOnboardingTasks] user create failed", err);
-        throw err;
+        return; // Concurrent create - success
       }
-    } else {
-      console.error("[runOnboardingTasks] user create failed", err);
-      throw err;
     }
+    throw err;
   }
 
-  // Best-effort: update Supabase auth user metadata using service-role key (server only)
-  try {
-    const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (svcKey && url) {
+  // Best-effort: update Supabase auth metadata (non-blocking)
+  const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (svcKey && url) {
+    try {
       const admin = createAdminClient(url, svcKey, {
         auth: { persistSession: false },
       });
-      const metadataUpdate = {
+      await admin.auth.admin.updateUserById(userId, {
         user_metadata: { onboarded: true, profileDraft: null },
-      };
-
-      if (hasAdminUpdateUserById(admin)) {
-        await admin.auth.admin.updateUserById(userId, metadataUpdate);
-      } else if (hasAuthUpdateUser(admin)) {
-        // fallback if client exposes updateUser
-        await admin.auth.updateUser({
-          id: userId,
-          data: metadataUpdate.user_metadata,
-        });
-      } else {
-        console.debug(
-          "[runOnboardingTasks] admin update method not available on this supabase client version",
-        );
-      }
-      console.debug(
-        "[runOnboardingTasks] updated auth metadata (best-effort)",
-        { userId },
-      );
-    } else {
-      console.debug(
-        "[runOnboardingTasks] no service role key; skipped clearing profileDraft in auth",
-      );
+      });
+    } catch (err) {
+      // Non-blocking: log but don't fail onboarding
+      console.error("Failed to update auth metadata:", err);
     }
-  } catch (err: unknown) {
-    // Don't fail the whole onboarding just because auth metadata update failed,
-    // but surface the error in logs for diagnostics.
-    console.debug("[runOnboardingTasks] failed to update auth metadata", err);
   }
-
-  console.debug("[runOnboardingTasks] completed", { userId });
 }
 
 /**
@@ -171,50 +106,24 @@ export async function onboardAction(formData: FormData) {
     );
   }
 
-  const payload = Object.fromEntries(formData.entries()) as Record<
-    string,
-    unknown
-  >;
+  const getString = (value: unknown): string | null => {
+    const str = value != null ? String(value).trim() : "";
+    return str !== "" ? str : null;
+  };
+
   const p = {
-    username: String(payload.username ?? ""),
-    firstName:
-      payload.firstName != null && String(payload.firstName ?? "") !== ""
-        ? String(payload.firstName)
-        : null,
-    lastName:
-      payload.lastName != null && String(payload.lastName ?? "") !== ""
-        ? String(payload.lastName)
-        : null,
-    email:
-      payload.email != null && String(payload.email ?? "") !== ""
-        ? String(payload.email)
-        : null,
-    phoneNumber:
-      payload.phoneNumber != null && String(payload.phoneNumber ?? "") !== ""
-        ? String(payload.phoneNumber)
-        : null,
-    streetAddress:
-      payload.streetAddress != null &&
-      String(payload.streetAddress ?? "") !== ""
-        ? String(payload.streetAddress)
-        : null,
-    addressLine2:
-      payload.addressLine2 != null && String(payload.addressLine2 ?? "") !== ""
-        ? String(payload.addressLine2)
-        : null,
-    city:
-      payload.city != null && String(payload.city ?? "") !== ""
-        ? String(payload.city)
-        : null,
-    stateOrTerritory:
-      payload.stateOrTerritory != null &&
-      String(payload.stateOrTerritory ?? "") !== ""
-        ? (String(payload.stateOrTerritory) as unknown as USStateTerritory)
-        : null,
-    postalCode:
-      payload.postalCode != null && String(payload.postalCode ?? "") !== ""
-        ? String(payload.postalCode)
-        : null,
+    username: String(formData.get("username") ?? ""),
+    firstName: getString(formData.get("firstName")),
+    lastName: getString(formData.get("lastName")),
+    email: getString(formData.get("email")),
+    phoneNumber: getString(formData.get("phoneNumber")),
+    streetAddress: getString(formData.get("streetAddress")),
+    addressLine2: getString(formData.get("addressLine2")),
+    city: getString(formData.get("city")),
+    stateOrTerritory: getString(
+      formData.get("stateOrTerritory"),
+    ) as USStateTerritory | null,
+    postalCode: getString(formData.get("postalCode")),
   };
 
   try {
