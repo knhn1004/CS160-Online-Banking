@@ -5,6 +5,7 @@
 
 import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/auth-context";
 import { api } from "./api";
 import type {
   InternalAccount,
@@ -28,10 +29,23 @@ export const queryKeys = {
 
 // Accounts queries
 export function useAccounts() {
+  const { session } = useAuth();
   return useQuery({
     queryKey: queryKeys.accounts,
     queryFn: () => api.getAccounts(),
+    enabled: !!session, // Only run when we have a session
     staleTime: 30 * 1000, // 30 seconds
+    retry: (failureCount, error) => {
+      // Don't retry on 401/authentication errors - let the API client handle auth
+      if (
+        error instanceof Error &&
+        (error.message.includes("Unauthorized") ||
+          error.message.includes("Not authenticated"))
+      ) {
+        return false;
+      }
+      return failureCount < 1; // Default retry once
+    },
   });
 }
 
@@ -45,10 +59,23 @@ export function useAccount(id: number) {
 
 // Transactions queries
 export function useTransactions(limit?: number) {
+  const { session } = useAuth();
   return useQuery({
     queryKey: queryKeys.transactions(limit),
     queryFn: () => api.getTransactions(limit),
+    enabled: !!session, // Only run when we have a session
     staleTime: 30 * 1000, // 30 seconds
+    retry: (failureCount, error) => {
+      // Don't retry on 401/authentication errors - let the API client handle auth
+      if (
+        error instanceof Error &&
+        (error.message.includes("Unauthorized") ||
+          error.message.includes("Not authenticated"))
+      ) {
+        return false;
+      }
+      return failureCount < 1; // Default retry once
+    },
   });
 }
 
@@ -87,10 +114,24 @@ export function useTransferHistoryInfinite(params?: {
 
 // Profile queries
 export function useProfile() {
+  const { session } = useAuth();
   return useQuery({
     queryKey: queryKeys.profile,
     queryFn: () => api.getProfile(),
+    enabled: !!session, // Only run when we have a session
     staleTime: 60 * 1000, // 1 minute
+    retry: (failureCount, error) => {
+      // Don't retry on 401/authentication errors - let the API client handle auth
+      // Profile might not exist for new users, so don't retry aggressively
+      if (
+        error instanceof Error &&
+        (error.message.includes("Unauthorized") ||
+          error.message.includes("Not authenticated"))
+      ) {
+        return false;
+      }
+      return failureCount < 1; // Default retry once
+    },
   });
 }
 
@@ -154,22 +195,44 @@ export function useMakeApiKeyTransaction() {
 }
 
 // Polling hook for account balances (to detect external API key transactions)
-export function useAccountBalancePolling(intervalMs: number = 5000) {
+export function useAccountBalancePolling(
+  intervalMs: number = 5000,
+  enabled: boolean = true,
+) {
   const queryClient = useQueryClient();
   const previousBalancesRef = useRef<Map<number, number>>(new Map());
+  const consecutiveErrorsRef = useRef(0);
+  const intervalIdRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    // Don't poll if disabled (e.g., user not authenticated)
+    if (!enabled) {
+      // Clear any existing interval
+      if (intervalIdRef.current) {
+        clearInterval(intervalIdRef.current);
+        intervalIdRef.current = null;
+      }
+      consecutiveErrorsRef.current = 0;
+      return;
+    }
+
     const pollBalances = async () => {
       try {
         const balanceData = await api.getAccountBalances();
         const currentBalances = new Map<number, number>();
+
+        // Reset error counter on success
+        consecutiveErrorsRef.current = 0;
 
         // Check if any balances have changed
         let hasChanged = false;
         for (const account of balanceData.accounts) {
           currentBalances.set(account.id, account.balance);
           const previousBalance = previousBalancesRef.current.get(account.id);
-          if (previousBalance !== undefined && previousBalance !== account.balance) {
+          if (
+            previousBalance !== undefined &&
+            previousBalance !== account.balance
+          ) {
             hasChanged = true;
           }
         }
@@ -183,8 +246,31 @@ export function useAccountBalancePolling(intervalMs: number = 5000) {
 
         previousBalancesRef.current = currentBalances;
       } catch (error) {
-        // Silently fail polling errors to avoid spamming console
-        console.debug("Balance polling error:", error);
+        consecutiveErrorsRef.current += 1;
+        
+        // Check if error is unauthorized
+        const isUnauthorized =
+          error instanceof Error &&
+          (error.message.includes("Unauthorized") ||
+            error.message.includes("Not authenticated"));
+
+        // Stop polling after 3 consecutive unauthorized errors
+        // This prevents spamming when session has expired
+        if (isUnauthorized && consecutiveErrorsRef.current >= 3) {
+          console.debug(
+            "Balance polling stopped: Too many unauthorized errors. Session may have expired.",
+          );
+          if (intervalIdRef.current) {
+            clearInterval(intervalIdRef.current);
+            intervalIdRef.current = null;
+          }
+          return;
+        }
+
+        // Log other errors but continue polling
+        if (!isUnauthorized) {
+          console.debug("Balance polling error:", error);
+        }
       }
     };
 
@@ -192,11 +278,15 @@ export function useAccountBalancePolling(intervalMs: number = 5000) {
     pollBalances();
 
     // Set up interval polling
-    const intervalId = setInterval(pollBalances, intervalMs);
+    intervalIdRef.current = setInterval(pollBalances, intervalMs);
 
     return () => {
-      clearInterval(intervalId);
+      if (intervalIdRef.current) {
+        clearInterval(intervalIdRef.current);
+        intervalIdRef.current = null;
+      }
+      consecutiveErrorsRef.current = 0;
     };
-  }, [intervalMs, queryClient]);
+  }, [intervalMs, queryClient, enabled]);
 }
 

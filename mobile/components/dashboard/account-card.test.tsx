@@ -12,10 +12,12 @@ jest.mock('expo-router', () => ({
 const mockAccount = {
   id: 1,
   account_number: '1234567890',
-  account_type: 'checking',
+  routing_number: '123456789',
+  account_type: 'checking' as const,
   balance: 1234.56,
   is_active: true,
   created_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-01-01T00:00:00Z',
 };
 
 describe('AccountCard', () => {
@@ -42,7 +44,7 @@ describe('AccountCard', () => {
   });
 
   it('formats different account types correctly', () => {
-    const savingsAccount = { ...mockAccount, account_type: 'savings' };
+    const savingsAccount = { ...mockAccount, account_type: 'savings' as const };
     const { getByText } = renderWithProviders(<AccountCard account={savingsAccount} />);
     
     expect(getByText('Savings Account')).toBeTruthy();

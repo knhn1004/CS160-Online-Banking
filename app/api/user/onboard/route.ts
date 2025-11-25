@@ -3,10 +3,6 @@ import { getPrisma } from "@/app/lib/prisma";
 import { getAuthUserFromRequest } from "@/lib/auth";
 import { RoleEnum, USStateTerritory } from "@prisma/client";
 
-type AuthSuccess = { ok: true; supabaseUser: { id: string; email?: string } };
-type AuthFailure = { ok: false; status?: number; body?: unknown };
-type AuthResult = AuthSuccess | AuthFailure;
-
 const OnboardSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   first_name: z.string().min(1, "First name is required"),
@@ -58,13 +54,9 @@ export async function POST(request: Request) {
     }
     const safeData: z.infer<typeof OnboardSchema> = result.data;
 
-    // require auth token from client and resolve auth_user_id
-    const auth = (await getAuthUserFromRequest(request).catch(
-      () => null,
-    )) as AuthResult;
-    const authUserId = auth.ok ? auth.supabaseUser.id : undefined;
-
-    if (!authUserId) {
+    // Require authentication
+    const auth = await getAuthUserFromRequest(request);
+    if (!auth.ok) {
       return new Response(
         JSON.stringify({
           message:
@@ -74,11 +66,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // create user row (auth_user_id is required by Prisma)
+    // Create user row
     const prisma = getPrisma();
     const user = await prisma.user.create({
       data: {
-        auth_user_id: authUserId,
+        auth_user_id: auth.supabaseUser.id,
         email: safeData.email,
         username: safeData.username,
         first_name: safeData.first_name,
@@ -94,9 +86,10 @@ export async function POST(request: Request) {
       },
     });
 
+    // Invalidate cache
     const { revalidatePath, revalidateTag } = await import("next/cache");
-    await revalidateTag(`user-${authUserId}`);
-    await revalidateTag(`profile-${authUserId}`);
+    await revalidateTag(`user-${auth.supabaseUser.id}`);
+    await revalidateTag(`profile-${auth.supabaseUser.id}`);
     await revalidateTag(`user-${user.id}`);
     await revalidateTag(`profile-${user.id}`);
     await revalidatePath("/dashboard");
@@ -110,8 +103,7 @@ export async function POST(request: Request) {
     console.error("Onboard POST error:", err);
     return new Response(
       JSON.stringify({
-        message: "Internal error",
-        details: err instanceof Error ? err.message : String(err),
+        message: "Internal server error",
       }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );

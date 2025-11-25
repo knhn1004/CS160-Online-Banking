@@ -33,67 +33,39 @@ export default async function DashboardPage() {
     });
 
     if (!existing) {
-      // Use any saved profileDraft in user_metadata, fallback to sensible defaults.
-      const userMeta = (user as Record<string, unknown>)["user_metadata"];
-      const draft =
-        userMeta && typeof userMeta === "object"
-          ? (((userMeta as Record<string, unknown>)["profileDraft"] as
-              | Record<string, unknown>
-              | undefined) ?? {})
-          : {};
+      // Extract profile draft from user metadata or use defaults
+      const userMeta = (user as Record<string, unknown>).user_metadata as
+        | Record<string, unknown>
+        | undefined;
+      const draft = (userMeta?.profileDraft as Record<string, unknown>) ?? {};
+      const email = (userRec.email as string) ?? null;
+      const emailPrefix = email ? email.split("@")[0] : undefined;
+      const userIdPrefix = String(userRec.id ?? "").slice(0, 8);
 
-      // Narrow/normalize runtime values so TypeScript knows the types are safe.
-      const emailStr = typeof userRec.email === "string" ? userRec.email : null;
-      const idStr = String(userRec.id ?? "");
-
-      const d = draft as Record<string, unknown>;
-      const draftUsername =
-        typeof d.username === "string" ? d.username : undefined;
-      const usernameFromEmail = emailStr ? emailStr.split("@")[0] : undefined;
-      const usernameDefault = String(
-        draftUsername ?? usernameFromEmail ?? `user-${idStr.slice(0, 8)}`,
-      );
-
-      const firstName = typeof d.firstName === "string" ? d.firstName : null;
-      const lastName = typeof d.lastName === "string" ? d.lastName : null;
-      const phoneNumber =
-        typeof d.phoneNumber === "string" ? d.phoneNumber : null;
-      const streetAddress =
-        typeof d.streetAddress === "string" ? d.streetAddress : null;
-      const addressLine2 =
-        typeof d.addressLine2 === "string" ? d.addressLine2 : null;
-      const city = typeof d.city === "string" ? d.city : null;
-      const postalCode = typeof d.postalCode === "string" ? d.postalCode : null;
-
-      // state must be validated at runtime; cast only if it's a string
-      const rawState = d.stateOrTerritory;
-      const stateOrTerritory =
-        typeof rawState === "string" ? (rawState as USStateTerritory) : null;
-
-      const payload = {
-        username: usernameDefault,
-        firstName,
-        lastName,
-        email: emailStr,
-        phoneNumber,
-        streetAddress,
-        addressLine2,
-        city,
-        stateOrTerritory,
-        postalCode,
+      const getString = (key: string): string | null => {
+        const value = draft[key];
+        return typeof value === "string" ? value : null;
       };
 
-      console.debug("[dashboard] running onboarding for user", {
-        userId: idStr,
-      });
       try {
-        await runOnboardingTasks(idStr, payload);
-        console.debug("[dashboard] onboarding complete for user", {
-          userId: idStr,
+        await runOnboardingTasks(userId, {
+          username:
+            getString("username") ?? emailPrefix ?? `user-${userIdPrefix}`,
+          firstName: getString("firstName"),
+          lastName: getString("lastName"),
+          email,
+          phoneNumber: getString("phoneNumber"),
+          streetAddress: getString("streetAddress"),
+          addressLine2: getString("addressLine2"),
+          city: getString("city"),
+          stateOrTerritory: getString(
+            "stateOrTerritory",
+          ) as USStateTerritory | null,
+          postalCode: getString("postalCode"),
         });
-      } catch (err: unknown) {
-        console.error("[dashboard] onboarding failed", err);
-        // don't block rendering; UI can show a banner if you read a query param
+      } catch (err) {
+        console.error("Onboarding failed:", err);
+        // Don't block rendering - UI can show error banner
       }
     }
   } catch (err: unknown) {
