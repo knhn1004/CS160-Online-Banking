@@ -69,7 +69,7 @@ describe("ProfileScreen", () => {
 
   afterEach(async () => {
     // Clean up any remaining async operations
-    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
   });
 
   it("shows loading state initially", () => {
@@ -243,8 +243,8 @@ describe("ProfileScreen", () => {
     mockGetProfile.mockResolvedValue(mockProfile);
     
     // Create a promise that we can control
-    let resolvePromise: (value: any) => void;
-    const pendingPromise = new Promise((resolve) => {
+    let resolvePromise: (value: typeof mockProfile) => void;
+    const pendingPromise = new Promise<typeof mockProfile>((resolve) => {
       resolvePromise = resolve;
     });
     
@@ -263,7 +263,7 @@ describe("ProfileScreen", () => {
 
     // Wait for the mutation to start and UI to update
     // Give React time to process the state change
-    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
     
     // The button should show ActivityIndicator (and hide "Save Changes" text)
     await waitFor(
