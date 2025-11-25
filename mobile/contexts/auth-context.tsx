@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api";
 import type { User, Session } from "@supabase/supabase-js";
@@ -15,6 +16,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,27 +51,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-        // Handle different auth events
-        // Only log important events, not every token refresh (too noisy)
-        if (event === "SIGNED_OUT") {
-          console.debug("User signed out");
-        } else if (event === "SIGNED_IN") {
-          console.debug("User signed in");
-        } else if (event === "TOKEN_REFRESHED") {
-          // Token was refreshed - session is updated automatically
-          console.debug("Token refreshed");
-        }
-        
-        // Update local state
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Update API client with current session
-        // This ensures API client always has the latest session
-        api.setSession(session);
-        
-        setLoading(false);
-      });
+      // Handle different auth events
+      // Only log important events, not every token refresh (too noisy)
+      if (event === "SIGNED_OUT") {
+        console.debug("User signed out");
+        // Clear all cached queries when user signs out
+        queryClient.clear();
+      } else if (event === "SIGNED_IN") {
+        console.debug("User signed in");
+      } else if (event === "TOKEN_REFRESHED") {
+        // Token was refreshed - session is updated automatically
+        console.debug("Token refreshed");
+      }
+      
+      // Update local state
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      // Update API client with current session
+      // This ensures API client always has the latest session
+      api.setSession(session);
+      
+      setLoading(false);
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -145,6 +149,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     // Clear API client session immediately
     api.setSession(null);
+    
+    // Clear all TanStack Query cache to remove user-specific data
+    // This ensures profile and other cached data is cleared on logout
+    queryClient.clear();
     
     // Sign out from Supabase (best effort - state already cleared)
     try {

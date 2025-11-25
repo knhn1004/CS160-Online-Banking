@@ -1,8 +1,7 @@
 "use server";
 
 import { getPrisma } from "@/app/lib/prisma";
-import { getAuthUserFromRequest } from "@/lib/auth";
-import { headers } from "next/headers";
+import { createClient } from "@/utils/supabase/server";
 import { User, Transaction, InternalAccount } from "@prisma/client";
 
 // Use Prisma generated types with select fields
@@ -83,20 +82,18 @@ export type DetailedTransaction = Pick<
 // Helper function to verify manager role
 async function verifyManagerRole(): Promise<boolean> {
   try {
-    const headersList = await headers();
-    const authResult = await getAuthUserFromRequest(
-      new Request("http://localhost", {
-        headers: headersList,
-      }),
-    );
+    const supabase = await createClient();
+    const {
+      data: { user: supabaseUser },
+    } = await supabase.auth.getUser();
 
-    if (!authResult.ok) {
+    if (!supabaseUser) {
       return false;
     }
 
     const prisma = getPrisma();
     const user = await prisma.user.findUnique({
-      where: { auth_user_id: authResult.supabaseUser.id },
+      where: { auth_user_id: supabaseUser.id },
       select: { role: true },
     });
 

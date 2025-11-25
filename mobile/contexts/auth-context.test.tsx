@@ -3,6 +3,7 @@
  */
 
 import { renderHook, waitFor } from "@testing-library/react-native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./auth-context";
 import { supabase } from "@/lib/supabase";
 
@@ -20,12 +21,26 @@ jest.mock("@/lib/supabase", () => ({
 }));
 
 describe("AuthContext", () => {
+  let queryClient: QueryClient;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    // Create a new QueryClient for each test to ensure clean state
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          gcTime: 0,
+          staleTime: 0,
+        },
+      },
+    });
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <AuthProvider>{children}</AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>{children}</AuthProvider>
+    </QueryClientProvider>
   );
 
   describe("initialization", () => {
