@@ -7,6 +7,21 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 /**
+ * Helper function to invalidate cache for a user
+ */
+async function invalidateUserCache(supabaseUserId: string, dbUserId?: number) {
+  const { revalidateTag } = await import("next/cache");
+  await revalidateTag(`user-${supabaseUserId}`);
+  await revalidateTag(`transactions-${supabaseUserId}`);
+  await revalidateTag(`accounts-${supabaseUserId}`);
+  if (dbUserId) {
+    await revalidateTag(`user-${dbUserId}`);
+    await revalidateTag(`transactions-${dbUserId}`);
+    await revalidateTag(`accounts-${dbUserId}`);
+  }
+}
+
+/**
  * @swagger
  * /api/transfers/external:
  *   post:
@@ -225,6 +240,9 @@ export async function POST(request: Request) {
           };
         });
 
+        // Invalidate cache for sender (balances changed)
+        await invalidateUserCache(auth.supabaseUser.id, currentUser.id);
+
         return new Response(JSON.stringify(result), {
           headers: { "Content-Type": "application/json" },
         });
@@ -287,6 +305,9 @@ export async function POST(request: Request) {
           };
         });
 
+        // Invalidate cache for sender (balances changed)
+        await invalidateUserCache(auth.supabaseUser.id, currentUser.id);
+
         return new Response(JSON.stringify(result), {
           headers: { "Content-Type": "application/json" },
         });
@@ -347,6 +368,9 @@ export async function POST(request: Request) {
           amount,
         };
       });
+
+      // Invalidate cache for sender (balances changed)
+      await invalidateUserCache(auth.supabaseUser.id, currentUser.id);
 
       return new Response(JSON.stringify(result), {
         headers: { "Content-Type": "application/json" },
@@ -430,6 +454,18 @@ export async function POST(request: Request) {
         amount,
       };
     });
+
+    // Invalidate cache for both sender and recipient (balances changed)
+    await invalidateUserCache(auth.supabaseUser.id, currentUser.id);
+
+    // Get recipient's Supabase user ID for cache invalidation
+    const recipientSupabaseUserId = destinationAccount.user.auth_user_id;
+    if (recipientSupabaseUserId) {
+      await invalidateUserCache(
+        recipientSupabaseUserId,
+        destinationAccount.user_id,
+      );
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { "Content-Type": "application/json" },
