@@ -87,17 +87,21 @@ export async function searchNearbyATMs(
   }
 
   try {
-    const response = await fetch(
+    const url =
       `https://maps.googleapis.com/maps/api/place/nearbysearch/json?` +
-        `location=${lat},${lng}&` +
-        `radius=5000&` +
-        `keyword=Chase ATM&` +
-        `type=atm&` +
-        `key=${apiKey}`,
-    );
+      `location=${lat},${lng}&` +
+      `radius=5000&` +
+      `keyword=Chase ATM&` +
+      `type=atm&` +
+      `key=${apiKey}`;
+
+    const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error(`Google Places API error: ${response.status}`);
+      const errorText = await response.text().catch(() => "");
+      throw new Error(
+        `Google Places API error: ${response.status}${errorText ? ` - ${errorText}` : ""}`,
+      );
     }
 
     const data = (await response.json()) as GooglePlacesResponse;
@@ -123,6 +127,26 @@ export async function searchNearbyATMs(
     );
   } catch (error) {
     console.error("Error searching for ATMs:", error);
+    
+    // Preserve original error message if it's informative
+    if (error instanceof Error) {
+      // Check if it's a network error (specific network-related error messages)
+      if (
+        error.message.includes("Network request failed") ||
+        error.message.includes("Failed to fetch") ||
+        (error.name === "TypeError" && 
+         (error.message.includes("network") || 
+          error.message.includes("fetch") ||
+          error.message.includes("Network")))
+      ) {
+        throw new Error(
+          "Network error: Unable to connect to Google Maps API. Please check your internet connection and ensure EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is set correctly.",
+        );
+      }
+      // Preserve other error messages
+      throw error;
+    }
+    
     throw new Error("Failed to search for nearby ATMs");
   }
 }
@@ -140,14 +164,18 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult> {
   }
 
   try {
-    const response = await fetch(
+    const url =
       `https://maps.googleapis.com/maps/api/geocode/json?` +
-        `address=${encodeURIComponent(address)}&` +
-        `key=${apiKey}`,
-    );
+      `address=${encodeURIComponent(address)}&` +
+      `key=${apiKey}`;
+
+    const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error(`Google Geocoding API error: ${response.status}`);
+      const errorText = await response.text().catch(() => "");
+      throw new Error(
+        `Google Geocoding API error: ${response.status}${errorText ? ` - ${errorText}` : ""}`,
+      );
     }
 
     const data = (await response.json()) as GoogleGeocodeResponse;
@@ -164,6 +192,26 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult> {
     };
   } catch (error) {
     console.error("Error geocoding address:", error);
+    
+    // Preserve original error message if it's informative
+    if (error instanceof Error) {
+      // Check if it's a network error (specific network-related error messages)
+      if (
+        error.message.includes("Network request failed") ||
+        error.message.includes("Failed to fetch") ||
+        (error.name === "TypeError" && 
+         (error.message.includes("network") || 
+          error.message.includes("fetch") ||
+          error.message.includes("Network")))
+      ) {
+        throw new Error(
+          "Network error: Unable to connect to Google Maps API. Please check your internet connection and ensure EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is set correctly.",
+        );
+      }
+      // Preserve other error messages
+      throw error;
+    }
+    
     throw new Error("Failed to geocode address");
   }
 }

@@ -104,7 +104,7 @@ describe('lib/atm', () => {
       });
 
       await expect(searchNearbyATMs(37.7749, -122.4194)).rejects.toThrow(
-        'Failed to search for nearby ATMs'
+        'Google Places API error: REQUEST_DENIED'
       );
     });
 
@@ -112,10 +112,11 @@ describe('lib/atm', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 500,
+        text: async () => 'Internal Server Error',
       });
 
       await expect(searchNearbyATMs(37.7749, -122.4194)).rejects.toThrow(
-        'Failed to search for nearby ATMs'
+        'Google Places API error: 500'
       );
     });
 
@@ -217,7 +218,7 @@ describe('lib/atm', () => {
       });
 
       await expect(geocodeAddress('Invalid Address')).rejects.toThrow(
-        'Failed to geocode address'
+        'Geocoding failed: ZERO_RESULTS'
       );
     });
 
@@ -225,10 +226,11 @@ describe('lib/atm', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 500,
+        text: async () => 'Internal Server Error',
       });
 
       await expect(geocodeAddress('123 Main St')).rejects.toThrow(
-        'Failed to geocode address'
+        'Google Geocoding API error: 500'
       );
     });
   });
