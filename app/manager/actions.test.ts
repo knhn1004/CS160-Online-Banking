@@ -33,14 +33,15 @@ vi.mock("@/app/lib/prisma", () => ({
   getPrisma: () => mockPrisma,
 }));
 
-// Mock auth functions
-vi.mock("@/lib/auth", () => ({
-  getAuthUserFromRequest: vi.fn(),
-}));
+// Mock Supabase server client
+const mockSupabaseClient = {
+  auth: {
+    getUser: vi.fn(),
+  },
+};
 
-// Mock headers
-vi.mock("next/headers", () => ({
-  headers: vi.fn(),
+vi.mock("@/utils/supabase/server", () => ({
+  createClient: vi.fn(async () => mockSupabaseClient),
 }));
 
 // Mock next/cache
@@ -48,18 +49,16 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }));
 
-import { getAuthUserFromRequest } from "@/lib/auth";
-import { headers } from "next/headers";
-
 describe("Manager Actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Mock successful auth by default
-    vi.mocked(getAuthUserFromRequest).mockResolvedValue({
-      ok: true,
-      supabaseUser: { id: "test-user-id", email: "manager@test.com" },
+    vi.mocked(mockSupabaseClient.auth.getUser).mockResolvedValue({
+      data: {
+        user: { id: "test-user-id", email: "manager@test.com" },
+      },
+      error: null,
     });
-    vi.mocked(headers).mockResolvedValue(new Headers());
   });
 
   afterEach(() => {
@@ -145,10 +144,9 @@ describe("Manager Actions", () => {
     });
 
     it("should throw error when auth fails", async () => {
-      vi.mocked(getAuthUserFromRequest).mockResolvedValue({
-        ok: false,
-        status: 401,
-        body: { message: "Unauthorized" },
+      vi.mocked(mockSupabaseClient.auth.getUser).mockResolvedValue({
+        data: { user: null },
+        error: { message: "Unauthorized", status: 401 },
       });
 
       await expect(getUsers({ page: 1, limit: 10 })).rejects.toThrow(
