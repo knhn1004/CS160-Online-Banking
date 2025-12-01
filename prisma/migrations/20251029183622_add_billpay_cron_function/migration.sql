@@ -10,7 +10,7 @@ DECLARE
   rule_record RECORD;
   source_account_record RECORD;
   payee_record RECORD;
-  current_time TIMESTAMP := NOW();
+  current_time TIMESTAMPTZ := NOW();
   idempotency_key TEXT;
   amount_decimal DECIMAL(19, 4);
 BEGIN
@@ -26,12 +26,13 @@ BEGIN
   END IF;
 
   -- Check if rule is within active time window
-  IF current_time < rule_record.start_time THEN
+  -- Convert both to TIMESTAMPTZ for comparison
+  IF current_time < rule_record.start_time::TIMESTAMPTZ THEN
     RAISE NOTICE 'Billpay rule % not yet started (start_time: %)', rule_id_param, rule_record.start_time;
     RETURN;
   END IF;
 
-  IF rule_record.end_time IS NOT NULL AND current_time > rule_record.end_time THEN
+  IF rule_record.end_time IS NOT NULL AND current_time > rule_record.end_time::TIMESTAMPTZ THEN
     RAISE NOTICE 'Billpay rule % has expired (end_time: %)', rule_id_param, rule_record.end_time;
     RETURN;
   END IF;
