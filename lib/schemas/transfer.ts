@@ -98,14 +98,45 @@ export const ExternalTransferSchema = z
 export type ExternalTransferData = z.infer<typeof ExternalTransferSchema>;
 
 // Transfer history query schema
+// Helper to transform date strings (YYYY-MM-DD) to datetime strings (ISO 8601)
+const dateToDatetimeStart = z
+  .string()
+  .transform((val) => {
+    // If it's already a datetime string, return as is
+    if (val.includes("T") || val.includes(" ")) {
+      return val;
+    }
+    // If it's a date string (YYYY-MM-DD), convert to datetime (start of day in UTC)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      return `${val}T00:00:00.000Z`;
+    }
+    return val;
+  })
+  .pipe(z.string().datetime());
+
+const dateToDatetimeEnd = z
+  .string()
+  .transform((val) => {
+    // If it's already a datetime string, return as is
+    if (val.includes("T") || val.includes(" ")) {
+      return val;
+    }
+    // If it's a date string (YYYY-MM-DD), convert to datetime (end of day in UTC)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      return `${val}T23:59:59.999Z`;
+    }
+    return val;
+  })
+  .pipe(z.string().datetime());
+
 export const TransferHistoryQuerySchema = z.object({
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100).default(20),
   type: z
     .enum(["internal_transfer", "external_transfer", "deposit"])
     .optional(),
-  start_date: z.string().datetime().optional(),
-  end_date: z.string().datetime().optional(),
+  start_date: dateToDatetimeStart.optional(),
+  end_date: dateToDatetimeEnd.optional(),
 });
 
 export type TransferHistoryQueryData = z.infer<

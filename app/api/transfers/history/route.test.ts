@@ -233,6 +233,43 @@ describe("GET /api/transfers/history", () => {
     );
   });
 
+  it("filters by date-only strings (YYYY-MM-DD) and converts them to datetime", async () => {
+    const mockUser = {
+      id: 1,
+      username: "testuser",
+      internal_accounts: [{ id: 10, account_number: "10000001" }],
+    };
+
+    vi.mocked(getAuthUserFromRequest).mockResolvedValue({
+      ok: true,
+      supabaseUser: { id: "user-123" },
+    } as never);
+
+    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
+    mockPrisma.transaction.count.mockResolvedValue(0);
+    mockPrisma.transaction.findMany.mockResolvedValue([]);
+
+    // Use date-only strings (as sent by HTML date inputs)
+    const startDate = "2024-01-01";
+    const endDate = "2024-01-31";
+    const request = new Request(
+      `http://localhost:3000/api/transfers/history?start_date=${startDate}&end_date=${endDate}`,
+    );
+    await GET(request);
+
+    // Should convert start_date to start of day and end_date to end of day
+    expect(mockPrisma.transaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          created_at: {
+            gte: new Date("2024-01-01T00:00:00.000Z"),
+            lte: new Date("2024-01-31T23:59:59.999Z"),
+          },
+        }),
+      }),
+    );
+  });
+
   it("returns empty array when user has no transfers", async () => {
     const mockUser = {
       id: 1,
