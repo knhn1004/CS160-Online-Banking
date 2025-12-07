@@ -215,6 +215,11 @@ describe("Transfer Schemas", () => {
 
       const result = TransferHistoryQuerySchema.safeParse(validData);
       expect(result.success).toBe(true);
+      if (result.success) {
+        // Full datetime strings should be preserved as-is
+        expect(result.data.start_date).toBe("2024-01-01T00:00:00Z");
+        expect(result.data.end_date).toBe("2024-12-31T23:59:59Z");
+      }
     });
 
     it("should validate query with minimal parameters", () => {
@@ -255,9 +260,24 @@ describe("Transfer Schemas", () => {
       expect(result.success).toBe(false);
     });
 
+    it("should accept date-only strings and transform them to datetime", () => {
+      const validData = {
+        start_date: "2024-01-01", // Date-only string should be accepted
+        end_date: "2024-12-31", // Date-only string should be accepted
+      };
+
+      const result = TransferHistoryQuerySchema.safeParse(validData);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // Should be transformed to datetime format
+        expect(result.data.start_date).toBe("2024-01-01T00:00:00.000Z");
+        expect(result.data.end_date).toBe("2024-12-31T23:59:59.999Z");
+      }
+    });
+
     it("should reject invalid date format", () => {
       const invalidData = {
-        start_date: "2024-01-01", // Invalid: not ISO datetime
+        start_date: "not-a-date", // Invalid: not a valid date format
       };
 
       const result = TransferHistoryQuerySchema.safeParse(invalidData);
