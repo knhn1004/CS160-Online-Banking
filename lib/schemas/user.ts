@@ -89,8 +89,19 @@ export const SignupSchema = z
     lastName: z.string().min(1, "Last name is required"),
     phoneNumber: z
       .string()
-      .min(10, "Phone number must contain at least 10 digits")
-      .regex(/\d/, "Phone number must contain digits"),
+      .min(1, "Phone number is required")
+      .max(14, "Phone number is too long")
+      .refine(
+        (phone) => {
+          // Extract digits only (user enters only the 10 digits after +1)
+          const digits = phone.replace(/\D/g, "");
+          // Must have exactly 10 digits
+          return digits.length === 10;
+        },
+        {
+          message: "Phone number must contain exactly 10 digits",
+        },
+      ),
     streetAddress: z.string().min(1, "Street address is required"),
     addressLine2: z.string().optional(),
     city: z.string().min(1, "City is required"),

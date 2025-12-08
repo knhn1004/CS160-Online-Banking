@@ -152,6 +152,54 @@ describe("SignupSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("should reject phone number with 11 digits", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "15551234567",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject phone number with 11 digits and formatting", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "1 (555) 123-4567",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject phone number longer than 20 characters", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "123456789012345678901", // 21 characters
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject phone number with more than 10 digits", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "12345678901", // 11 digits
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject phone number with 12 digits", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "123456789012", // 12 digits
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject phone number with less than 10 digits", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "123456789", // 9 digits
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("should reject invalid postal code", () => {
     const result = SignupSchema.safeParse({
       ...validSignupData,

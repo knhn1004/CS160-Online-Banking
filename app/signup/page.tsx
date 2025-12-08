@@ -200,13 +200,26 @@ export default async function Page({
             >
               Phone number
             </label>
-            <Input
-              id="phoneNumber"
-              name="phoneNumber"
-              type="tel"
-              defaultValue={initialDraft?.phoneNumber ?? ""}
-              aria-describedby="phoneNumber-error"
-            />
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-foreground font-medium">+1</span>
+              <Input
+                id="phoneNumber"
+                name="phoneNumber"
+                type="tel"
+                defaultValue={
+                  initialDraft?.phoneNumber
+                    ? initialDraft.phoneNumber
+                        .replace(/^\+1/, "")
+                        .replace(/\D/g, "")
+                        .slice(0, 10)
+                    : ""
+                }
+                placeholder="555-123-4567"
+                aria-describedby="phoneNumber-error"
+                maxLength={14}
+                className="flex-1"
+              />
+            </div>
             <p
               id="phoneNumber-error"
               className="text-sm text-destructive mt-1"

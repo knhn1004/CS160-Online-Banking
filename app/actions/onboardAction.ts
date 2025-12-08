@@ -35,6 +35,13 @@ export async function runOnboardingTasks(
     postalCode?: string | null;
   },
 ) {
+  // Validate phone number format if provided (must be E.164: +1XXXXXXXXXX = 12 chars)
+  if (p.phoneNumber && p.phoneNumber.length !== 12) {
+    throw new Error(
+      `Invalid phone number format: expected E.164 format (+1XXXXXXXXXX), got length ${p.phoneNumber.length}`,
+    );
+  }
+
   // Create user row (race-safe: P2002 duplicate key is treated as success)
   try {
     await prisma.user.create({
@@ -111,12 +118,36 @@ export async function onboardAction(formData: FormData) {
     return str !== "" ? str : null;
   };
 
+  const normalizePhone = (phone?: string | null): string | null => {
+    if (!phone) return null;
+    // Extract digits only (user enters only the 10 digits after +1)
+    const digits = phone.replace(/\D/g, "");
+    // Must have exactly 10 digits
+    if (digits.length === 10) return `+1${digits}`;
+    return null;
+  };
+
+  const rawPhoneNumber = getString(formData.get("phoneNumber"));
+  const normalizedPhone = rawPhoneNumber
+    ? normalizePhone(rawPhoneNumber)
+    : null;
+
+  // Validate phone number if provided
+  if (rawPhoneNumber && (!normalizedPhone || normalizedPhone.length !== 12)) {
+    return redirect(
+      "/dashboard?onboard_error=1&message=" +
+        encodeURIComponent(
+          "Invalid phone number format. Please enter a valid 10-digit US phone number.",
+        ),
+    );
+  }
+
   const p = {
     username: String(formData.get("username") ?? ""),
     firstName: getString(formData.get("firstName")),
     lastName: getString(formData.get("lastName")),
     email: getString(formData.get("email")),
-    phoneNumber: getString(formData.get("phoneNumber")),
+    phoneNumber: normalizedPhone,
     streetAddress: getString(formData.get("streetAddress")),
     addressLine2: getString(formData.get("addressLine2")),
     city: getString(formData.get("city")),
