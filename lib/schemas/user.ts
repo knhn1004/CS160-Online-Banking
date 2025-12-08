@@ -85,8 +85,20 @@ export const SignupSchema = z
       .regex(/[a-z]/, "Password must contain at least one lowercase letter")
       .regex(/[0-9]/, "Password must contain at least one number"),
     confirmPassword: z.string(),
-    firstName: z.string().min(1, "First name is required"),
-    lastName: z.string().min(1, "Last name is required"),
+    firstName: z
+      .string()
+      .min(1, "First name is required")
+      .regex(
+        /^[a-zA-Z\s'-]+$/,
+        "First name can only contain letters, spaces, hyphens, and apostrophes",
+      ),
+    lastName: z
+      .string()
+      .min(1, "Last name is required")
+      .regex(
+        /^[a-zA-Z\s'-]+$/,
+        "Last name can only contain letters, spaces, hyphens, and apostrophes",
+      ),
     phoneNumber: z
       .string()
       .min(1, "Phone number is required")

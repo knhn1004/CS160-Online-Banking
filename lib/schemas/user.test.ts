@@ -128,6 +128,86 @@ describe("SignupSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("should reject first name with numbers", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      firstName: "John123",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject first name with special characters", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      firstName: "John@Doe",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should accept first name with hyphen", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      firstName: "Mary-Jane",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept first name with apostrophe", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      firstName: "O'Brien",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept first name with space", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      firstName: "Mary Jane",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject last name with numbers", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      lastName: "Doe123",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject last name with special characters", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      lastName: "Doe@Smith",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should accept last name with hyphen", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      lastName: "Smith-Jones",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept last name with apostrophe", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      lastName: "O'Connor",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept last name with space", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      lastName: "Van Der Berg",
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("should accept phone number with formatting", () => {
     const result = SignupSchema.safeParse({
       ...validSignupData,
