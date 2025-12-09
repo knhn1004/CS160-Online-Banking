@@ -64,11 +64,12 @@ export async function searchNearbyATMs(
     throw new Error("Google Maps API key not configured");
   }
 
+  // Google Places API keyword parameter is unreliable, extra filter below.
   try {
     const response = await fetch(
       `https://maps.googleapis.com/maps/api/place/nearbysearch/json?` +
         `location=${lat},${lng}&` +
-        `radius=5000&` +
+        `radius=16000&` +
         `keyword=Chase ATM&` +
         `type=atm&` +
         `key=${apiKey}`,
@@ -84,8 +85,22 @@ export async function searchNearbyATMs(
       throw new Error(`Google Places API error: ${data.status}`);
     }
 
+    // Filter results to only include Chase ATMs:
+    const chaseResults = data.results.filter((place) => {
+      const name = place.name.toLowerCase();
+      const vicinity = place.vicinity.toLowerCase();
+      const searchText = `${name} ${vicinity}`;
+
+      const hasChase = searchText.includes("chase");
+      const hasATM =
+        searchText.includes("atm") || searchText.includes("automated teller");
+      const isBranch = searchText.includes("bank") && !hasATM;
+
+      return hasChase && hasATM && !isBranch;
+    });
+
     // Calculate distance for each result
-    const results = data.results.map((place) => ({
+    const results = chaseResults.map((place) => ({
       ...place,
       distance: calculateDistance(
         lat,
