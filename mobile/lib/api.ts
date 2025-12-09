@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { supabase } from "./supabase";
+import type { Session } from "@supabase/supabase-js";
 
 // Determine the correct API URL based on platform and environment
 const getDefaultApiUrl = () => {
@@ -14,10 +15,11 @@ const getDefaultApiUrl = () => {
   return "http://localhost:3000";
 };
 
-const API_URL =
+const API_URL = (
   Constants.expoConfig?.extra?.apiUrl ||
   process.env.EXPO_PUBLIC_API_URL ||
-  getDefaultApiUrl();
+  getDefaultApiUrl()
+).replace(/\/$/, ""); // Remove trailing slash to prevent double slashes
 
 export interface InternalAccount {
   id: number;
@@ -63,42 +65,164 @@ export interface ApiError {
 
 class ApiClient {
   private onUnauthorizedCallback?: () => void;
+  private refreshPromise: Promise<string | null> | null = null;
+  private logoutTriggered: boolean = false;
+  private currentSession: Session | null = null;
 
   // Set callback for handling unauthorized errors
   setUnauthorizedHandler(callback: () => void) {
     this.onUnauthorizedCallback = callback;
   }
 
-  private async getAuthToken(): Promise<string | null> {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    return session?.access_token || null;
+  // Update current session (called from auth context when session changes)
+  setSession(session: Session | null) {
+    this.currentSession = session;
+    // Reset logout flag when we get a new valid session
+    if (session) {
+      this.logoutTriggered = false;
+      // Verify session has access_token
+      if (!session.access_token) {
+        console.warn("Session set without access_token");
+      }
+    } else {
+      // Clear session
+      this.currentSession = null;
+    }
+  }
+
+  private async getAuthToken(forceRefresh = false): Promise<string | null> {
+    // First check if we have a current session from auth context
+    // This is more reliable than calling getSession() every time
+    let session = this.currentSession;
+
+    // If no session in context, try to get it from Supabase
+    // This handles edge cases where context hasn't updated yet
+    if (!session) {
+      const {
+        data: { session: fetchedSession },
+        error,
+      } = await supabase.auth.getSession();
+
+      if (error || !fetchedSession) {
+        console.debug("No session available from Supabase:", error?.message);
+        return null;
+      }
+
+      session = fetchedSession;
+      this.currentSession = fetchedSession; // Cache it
+    }
+
+    // Verify session has access_token
+    if (!session?.access_token) {
+      console.debug("Session exists but no access_token available");
+      return null;
+    }
+
+    // If force refresh requested, try to refresh the session
+    if (forceRefresh) {
+      // If a refresh is already in progress, wait for it
+      if (this.refreshPromise) {
+        return await this.refreshPromise;
+      }
+
+      // Create a single refresh promise that all concurrent requests can share
+      this.refreshPromise = (async () => {
+        try {
+          const {
+            data: { session: refreshedSession },
+            error: refreshError,
+          } = await supabase.auth.refreshSession(session);
+          
+          if (refreshError || !refreshedSession?.access_token) {
+            console.debug("Token refresh failed:", refreshError?.message);
+            // Refresh failed - clear cached session
+            this.currentSession = null;
+            return session.access_token || null;
+          }
+          
+          // Update cached session
+          // Note: The auth context's onAuthStateChange listener will also update
+          // when Supabase emits the TOKEN_REFRESHED event, but we update here
+          // immediately to avoid race conditions
+          this.currentSession = refreshedSession;
+          console.debug("Token refreshed successfully");
+          return refreshedSession.access_token;
+        } finally {
+          this.refreshPromise = null;
+        }
+      })();
+
+      return await this.refreshPromise;
+    }
+
+    return session.access_token;
   }
 
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
+    retryOn401 = true,
   ): Promise<T> {
-    const token = await this.getAuthToken();
+    let token = await this.getAuthToken();
 
     if (!token) {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    // Build headers - React Native fetch requires Headers object for proper transmission
+    const fetchHeaders = new Headers();
+    fetchHeaders.set("Content-Type", "application/json");
+    fetchHeaders.set("Authorization", `Bearer ${token}`);
+
+    // Merge with any existing headers from options
+    if (options.headers) {
+      if (options.headers instanceof Headers) {
+        options.headers.forEach((value, key) => {
+          fetchHeaders.set(key, value);
+        });
+      } else if (Array.isArray(options.headers)) {
+        options.headers.forEach(([key, value]) => {
+          fetchHeaders.set(key, value);
+        });
+      } else {
+        Object.entries(options.headers).forEach(([key, value]) => {
+          if (value) {
+            fetchHeaders.set(key, String(value));
+          }
+        });
+      }
+    }
+
+    let response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        ...options.headers,
-      },
+      headers: fetchHeaders,
     });
 
+    // If we get a 401 and retry is enabled, try refreshing the token once
+    if (!response.ok && response.status === 401 && retryOn401) {
+      const refreshedToken = await this.getAuthToken(true);
+
+      if (refreshedToken && refreshedToken !== token) {
+        // Retry the request with the new token
+        const retryHeaders = new Headers(fetchHeaders);
+        retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
+        response = await fetch(`${API_URL}${endpoint}`, {
+          ...options,
+          headers: retryHeaders,
+        });
+      }
+    }
+
     if (!response.ok) {
-      // Handle 401 Unauthorized - trigger logout
+      // Handle 401 Unauthorized - only trigger logout if we don't have a valid session
       if (response.status === 401) {
-        if (this.onUnauthorizedCallback) {
+        // Check if we still have a valid session
+        const hasValidSession = this.currentSession?.access_token !== null;
+
+        if (!hasValidSession && !this.logoutTriggered && this.onUnauthorizedCallback) {
+          // Only logout if we don't have a valid session
+          // This prevents logout when session is still being established
+          this.logoutTriggered = true;
           this.onUnauthorizedCallback();
         }
       }
@@ -109,6 +233,11 @@ class ApiClient {
       
       // Prefer message field, fall back to error field, then ApiError.message
       let errorMessage = error.message || error.error || `HTTP error! status: ${response.status}`;
+      
+      // For 401 errors, add "Unauthorized" to the message so queries can detect it
+      if (response.status === 401) {
+        errorMessage = `Unauthorized: ${errorMessage}`;
+      }
       
       // If there are validation details, try to extract more specific error messages
       if (error.details && Array.isArray(error.details)) {
@@ -140,21 +269,21 @@ class ApiClient {
   }
 
   async getAccountBalances(): Promise<{
-    accounts: Array<{
+    accounts: {
       id: number;
       account_number: string;
       balance: number;
       created_at: string;
-    }>;
+    }[];
     timestamp: string;
   }> {
     return this.request<{
-      accounts: Array<{
+      accounts: {
         id: number;
         account_number: string;
         balance: number;
         created_at: string;
-      }>;
+      }[];
       timestamp: string;
     }>("/api/accounts/balance");
   }
@@ -218,7 +347,7 @@ class ApiClient {
     country?: string;
     role?: "customer" | "bank_manager";
   }): Promise<{ user: UserProfile }> {
-    return this.request<{ user: UserProfile }>("/api/users/onboard", {
+    return this.request<{ user: UserProfile }>("/api/user/onboard", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -226,7 +355,7 @@ class ApiClient {
 
   // API Keys API methods
   async getApiKeys(): Promise<{
-    api_keys: Array<{
+    api_keys: {
       id: number;
       key_prefix: string;
       account_id: number;
@@ -236,10 +365,10 @@ class ApiClient {
       is_active: boolean;
       created_at: string;
       last_used_at: string | null;
-    }>;
+    }[];
   }> {
     return this.request<{
-      api_keys: Array<{
+      api_keys: {
         id: number;
         key_prefix: string;
         account_id: number;
@@ -249,7 +378,7 @@ class ApiClient {
         is_active: boolean;
         created_at: string;
         last_used_at: string | null;
-      }>;
+      }[];
     }>("/api/api-keys");
   }
 

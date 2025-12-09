@@ -226,7 +226,7 @@ export async function POST(request: Request) {
     const amount = new Decimal(extractedData.amount.toString());
 
     // Create deposit transaction
-    return await prisma.$transaction(async (tx) => {
+    const transactionResult = await prisma.$transaction(async (tx) => {
       // Check for existing transaction
       const existing = await findExistingTransaction(tx, {
         idempotency_key,
@@ -236,11 +236,11 @@ export async function POST(request: Request) {
       });
 
       if (existing) {
-        return json(200, {
+        return {
           status: "Deposit already processed (idempotency key found)",
           transaction_id: existing.id,
-          amount: Math.round(Number(amount) * 100), // Convert dollars to cents
-        });
+          amount: Math.round(Number(amount)),
+        };
       }
 
       // Update account balance
@@ -263,7 +263,7 @@ export async function POST(request: Request) {
       );
 
       if (!result.transaction) {
-        return json(500, { error: "Failed to create transaction" });
+        throw new Error("Failed to create transaction");
       }
 
       // Update transaction with check-specific data
@@ -283,10 +283,10 @@ export async function POST(request: Request) {
         },
       });
 
-      return json(200, {
+      return {
         status: result.duplicate ? result.message : "Check deposit successful",
         transaction_id: result.transaction.id,
-        amount: Math.round(Number(amount) * 100), // Convert dollars to cents
+        amount: Math.round(Number(amount)),
         validation_result: {
           extracted_amount: extractedData.amount,
           routing_number: extractedData.routing_number,
@@ -295,8 +295,20 @@ export async function POST(request: Request) {
           payee_name: extractedData.payee_name,
           payor_name: extractedData.payor_name,
         },
-      });
+      };
     });
+
+    // Invalidate cache after successful deposit (balance changed)
+    const { revalidateTag } = await import("next/cache");
+    await revalidateTag(`user-${auth.supabaseUser.id}`);
+    await revalidateTag(`transactions-${auth.supabaseUser.id}`);
+    await revalidateTag(`accounts-${auth.supabaseUser.id}`);
+    // Also invalidate by database user ID for compatibility
+    await revalidateTag(`user-${account.user_id}`);
+    await revalidateTag(`transactions-${account.user_id}`);
+    await revalidateTag(`accounts-${account.user_id}`);
+
+    return json(200, transactionResult);
   } catch (error) {
     console.error("Error processing check deposit:", error);
     return json(500, {

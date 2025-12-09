@@ -4,15 +4,9 @@
     "strict": true,
     "paths": {
       "@/*": ["./*"]
-    }
+    },
+    "types": ["node", "jest"]
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
-  "exclude": [
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/__tests__/**",
-    "node_modules",
-    ".expo",
-    "coverage"
-  ]
+  "exclude": ["node_modules", ".expo", "coverage"]
 }

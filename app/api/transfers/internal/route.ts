@@ -266,6 +266,17 @@ export async function POST(request: Request) {
       };
     });
 
+    // Invalidate cache after successful transfer (balances changed)
+    const { revalidateTag } = await import("next/cache");
+    await revalidateTag(`user-${auth.supabaseUser.id}`);
+    await revalidateTag(`transactions-${auth.supabaseUser.id}`);
+    await revalidateTag(`accounts-${auth.supabaseUser.id}`);
+    if (currentUser) {
+      await revalidateTag(`user-${currentUser.id}`);
+      await revalidateTag(`transactions-${currentUser.id}`);
+      await revalidateTag(`accounts-${currentUser.id}`);
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { "Content-Type": "application/json" },
     });

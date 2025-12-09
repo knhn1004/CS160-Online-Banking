@@ -10,8 +10,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useTheme } from "@/contexts/theme-context";
+import { useAuth } from "@/contexts/auth-context";
 import { Colors } from "@/constants/theme";
-import { useAccounts, useTransactions, useProfile, useAccountBalancePolling } from "@/lib/queries";
+import {
+  useAccounts,
+  useTransactions,
+  useProfile,
+  useAccountBalancePolling,
+} from "@/lib/queries";
 import { BalanceCard } from "@/components/dashboard/balance-card";
 import { AccountCard } from "@/components/dashboard/account-card";
 import { TransactionItem } from "@/components/dashboard/transaction-item";
@@ -19,12 +25,19 @@ import { TransactionItem } from "@/components/dashboard/transaction-item";
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { user, session } = useAuth();
   const colors = Colors[theme];
 
-  // Poll account balances every 5 seconds to detect external API key transactions
-  useAccountBalancePolling(5000);
+  // Only enable queries when we have both user and session
+  // This prevents queries from running before auth is fully established
+  const isAuthenticated = !!(user && session);
 
-  // Use TanStack Query hooks
+  // Poll account balances every 5 seconds to detect external API key transactions
+  // Only poll when user is authenticated AND session is valid
+  // Using session instead of just user to ensure token is still valid
+  useAccountBalancePolling(5000, isAuthenticated);
+
+  // Use TanStack Query hooks - only enable when authenticated
   const {
     data: accountsData,
     isLoading: accountsLoading,

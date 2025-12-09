@@ -138,8 +138,15 @@ export async function POST(request: Request) {
           amount: Number(amount),
         };
 
-        // Invalidate cache after successful transaction
+        // Invalidate cache after successful transaction (use Supabase user ID)
         const { revalidateTag } = await import("next/cache");
+        const supabaseUserId = account.user.auth_user_id;
+        if (supabaseUserId) {
+          await revalidateTag(`user-${supabaseUserId}`);
+          await revalidateTag(`transactions-${supabaseUserId}`);
+          await revalidateTag(`accounts-${supabaseUserId}`);
+        }
+        // Also invalidate by database user ID for compatibility
         await revalidateTag(`user-${auth.userId}`);
         await revalidateTag(`transactions-${auth.userId}`);
         await revalidateTag(`accounts-${auth.userId}`);
@@ -196,8 +203,15 @@ export async function POST(request: Request) {
           amount: Number(amount),
         };
 
-        // Invalidate cache after successful transaction
+        // Invalidate cache after successful transaction (use Supabase user ID)
         const { revalidateTag } = await import("next/cache");
+        const supabaseUserId = account.user.auth_user_id;
+        if (supabaseUserId) {
+          await revalidateTag(`user-${supabaseUserId}`);
+          await revalidateTag(`transactions-${supabaseUserId}`);
+          await revalidateTag(`accounts-${supabaseUserId}`);
+        }
+        // Also invalidate by database user ID for compatibility
         await revalidateTag(`user-${auth.userId}`);
         await revalidateTag(`transactions-${auth.userId}`);
         await revalidateTag(`accounts-${auth.userId}`);

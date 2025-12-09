@@ -291,7 +291,7 @@ export function CheckDepositForm() {
                 <View style={styles.successAmountContainer}>
                   {successData.amount && (
                     <ThemedText style={styles.successAmount}>
-                      {formatCurrency(successData.amount / 100)}
+                      {formatCurrency(successData.amount)}
                     </ThemedText>
                   )}
                 </View>

@@ -1,5 +1,5 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   View,
   TextInput,
@@ -21,7 +21,7 @@ const US_STATES = USStateTerritorySchema.options;
 
 export default function SignupScreen() {
   const router = useRouter();
-  const { signUp, user } = useAuth();
+  const { signUp } = useAuth();
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -38,13 +38,6 @@ export default function SignupScreen() {
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (user) {
-      router.replace("/(tabs)/(home)");
-    }
-  }, [user, router]);
 
   const validate = () => {
     const result = SignupSchema.safeParse(formData);
@@ -99,7 +92,8 @@ export default function SignupScreen() {
         role: "customer",
       });
 
-      router.replace("/(tabs)/(home)");
+      // Don't manually redirect - let the layout's navigation logic handle it
+      // This prevents conflicts and infinite loops
     } catch (error) {
       Toast.show({
         type: "error",
@@ -123,10 +117,10 @@ export default function SignupScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <ThemedView style={styles.content}>
           <ThemedText type="title" style={styles.title}>
-            Sign In
+            Sign Up
           </ThemedText>
 
-        <View style={styles.form}>
+          <View style={styles.form}>
           <View style={styles.inputGroup}>
             <ThemedText style={styles.label}>Username *</ThemedText>
             <TextInput
@@ -356,11 +350,11 @@ export default function SignupScreen() {
               <ThemedText style={styles.linkTextBold}>Sign in</ThemedText>
             </ThemedText>
           </TouchableOpacity>
-        </View>
-      </ThemedView>
-    </ScrollView>
-  </SafeAreaView>
-);
+          </View>
+        </ThemedView>
+      </ScrollView>
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({

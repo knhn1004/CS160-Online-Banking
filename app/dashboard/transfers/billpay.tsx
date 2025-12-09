@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
@@ -14,13 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  CheckCircle,
-  ArrowRight,
-  Calendar,
-  Trash2,
-  Pencil,
-} from "lucide-react";
+import { CheckCircle, ArrowRight, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -33,6 +27,8 @@ import { BillPayPayeeSchema } from "@/lib/schemas/billpay";
 import { InternalAccountResponse } from "@/lib/schemas/transfer";
 import { formatCurrency } from "@/lib/utils";
 import { CurrencyInputField } from "./currency-input";
+import type { BillPayPayee, BillPayRule } from "./billpay-types";
+import { BILLPAY_FREQUENCY_PRESETS } from "./billpay-constants";
 
 type FormState =
   | "idle"
@@ -64,35 +60,13 @@ interface BillPayFormData {
   end_time?: string;
 }
 
-interface BillPayPayee {
-  id: number;
-  business_name: string;
-  email: string;
-  phone: string;
-  account_number: string;
-  routing_number: string;
-}
-
-interface BillPayRule {
-  id: number;
-  source_internal_id: number;
-  payee_id: number;
-  amount: number;
-  frequency: string;
-  start_time: string;
-  end_time: string | null;
-}
-
-// Common frequency presets
-const FREQUENCY_PRESETS = [
-  { label: "Daily", value: "0 9 * * *" }, // Every day at 9 AM
-  { label: "Weekly (Monday)", value: "0 9 * * 1" },
-  { label: "Bi-weekly (Monday)", value: "0 9 */2 * *" },
-  { label: "Monthly (1st)", value: "0 9 1 * *" },
-  { label: "Custom", value: "custom" },
-];
-
-export function BillPay() {
+export function BillPay({
+  initialEditRuleId,
+  onEditRuleConsumed,
+}: {
+  initialEditRuleId?: number;
+  onEditRuleConsumed?: () => void;
+}) {
   const router = useRouter();
   const [formState, setFormState] = useState<FormState>("idle");
   const [accounts, setAccounts] = useState<InternalAccountResponse[]>([]);
@@ -111,6 +85,9 @@ export function BillPay() {
     amount: number;
     payee_name: string;
   } | null>(null);
+  const [consumedEditRuleId, setConsumedEditRuleId] = useState<number | null>(
+    null,
+  );
 
   const form = useForm({
     defaultValues: {
@@ -140,6 +117,14 @@ export function BillPay() {
         const frequency =
           frequencyPreset === "custom" ? customFrequency : frequencyPreset;
 
+        // Convert datetime-local format to ISO datetime string
+        const startTimeISO = value.start_time
+          ? new Date(value.start_time).toISOString()
+          : "";
+        const endTimeISO = value.end_time
+          ? new Date(value.end_time).toISOString()
+          : undefined;
+
         const requestBody: {
           source_account_id: number;
           payee_id?: number;
@@ -152,7 +137,7 @@ export function BillPay() {
           source_account_id: value.source_account_id,
           amount: value.amount,
           frequency,
-          start_time: value.start_time,
+          start_time: startTimeISO,
         };
 
         if (value.payee_id) {
@@ -161,8 +146,8 @@ export function BillPay() {
           requestBody.payee = value.payee;
         }
 
-        if (value.end_time) {
-          requestBody.end_time = value.end_time;
+        if (endTimeISO) {
+          requestBody.end_time = endTimeISO;
         }
 
         const response = await fetch("/api/billpay/rules", {
@@ -308,31 +293,68 @@ export function BillPay() {
     }
   };
 
-  const handleEditRule = (ruleId: number) => {
-    const rule = rules.find((r) => r.id === ruleId);
-    if (!rule) return;
+  const handleEditRule = useCallback(
+    (ruleId: number) => {
+      const rule = rules.find((r) => r.id === ruleId);
+      if (!rule) return;
 
-    setEditingRuleId(ruleId);
-    // Pre-populate form with existing rule data
-    form.setFieldValue("source_account_id", rule.source_internal_id);
-    form.setFieldValue("payee_id", rule.payee_id);
-    form.setFieldValue("amount", rule.amount.toString());
+      setEditingRuleId(ruleId);
+      // Pre-populate form with existing rule data
+      form.setFieldValue("source_account_id", rule.source_internal_id);
+      form.setFieldValue("payee_id", rule.payee_id);
+      form.setFieldValue("amount", rule.amount.toString());
 
-    // Set frequency preset if it matches
-    const preset = FREQUENCY_PRESETS.find((p) => p.value === rule.frequency);
-    if (preset) {
-      setFrequencyPreset(preset.value);
-    } else {
-      setFrequencyPreset("custom");
-      setCustomFrequency(rule.frequency);
+      // Set frequency preset if it matches
+      const preset = BILLPAY_FREQUENCY_PRESETS.find(
+        (p) => p.value === rule.frequency,
+      );
+      if (preset) {
+        setFrequencyPreset(preset.value);
+      } else {
+        setFrequencyPreset("custom");
+        setCustomFrequency(rule.frequency);
+      }
+
+      form.setFieldValue("frequency", rule.frequency);
+      // Convert ISO datetime to datetime-local format
+      form.setFieldValue(
+        "start_time",
+        rule.start_time
+          ? new Date(rule.start_time).toISOString().slice(0, 16)
+          : "",
+      );
+      form.setFieldValue(
+        "end_time",
+        rule.end_time ? new Date(rule.end_time).toISOString().slice(0, 16) : "",
+      );
+      setSelectedPayeeId(rule.payee_id);
+      setFormState("filling");
+    },
+    [rules, form],
+  );
+
+  useEffect(() => {
+    if (
+      !initialEditRuleId ||
+      consumedEditRuleId === initialEditRuleId ||
+      rules.length === 0
+    ) {
+      return;
     }
 
-    form.setFieldValue("frequency", rule.frequency);
-    form.setFieldValue("start_time", rule.start_time);
-    form.setFieldValue("end_time", rule.end_time || "");
-    setSelectedPayeeId(rule.payee_id);
-    setFormState("filling");
-  };
+    const ruleExists = rules.some((rule) => rule.id === initialEditRuleId);
+    if (ruleExists) {
+      handleEditRule(initialEditRuleId);
+      setConsumedEditRuleId(initialEditRuleId);
+      onEditRuleConsumed?.();
+    }
+  }, [
+    initialEditRuleId,
+    consumedEditRuleId,
+    rules,
+    handleEditRule,
+    onEditRuleConsumed,
+  ]);
 
   const handleUpdateRule = async () => {
     if (!editingRuleId) return;
@@ -377,10 +399,14 @@ export function BillPay() {
         updateData.frequency = frequency;
       }
       if (value.start_time) {
-        updateData.start_time = value.start_time;
+        // Convert datetime-local format to ISO datetime string
+        updateData.start_time = new Date(value.start_time).toISOString();
       }
       if (value.end_time !== undefined) {
-        updateData.end_time = value.end_time || null;
+        // Convert datetime-local format to ISO datetime string
+        updateData.end_time = value.end_time
+          ? new Date(value.end_time).toISOString()
+          : null;
       }
 
       const response = await fetch(`/api/billpay/rules/${editingRuleId}`, {
@@ -420,44 +446,6 @@ export function BillPay() {
     setCustomFrequency("");
   };
 
-  const handleDeleteRule = async (ruleId: number) => {
-    if (!confirm("Are you sure you want to delete this bill pay rule?")) {
-      return;
-    }
-
-    try {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        throw new Error("Not authenticated");
-      }
-
-      const response = await fetch(`/api/billpay/rules/${ruleId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const data = (await response.json()) as {
-          error: string;
-          details?: unknown;
-        };
-        throw new Error(data.error || "Failed to delete billpay rule");
-      }
-
-      fetchRules(); // Refresh rules list
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete billpay rule",
-      );
-    }
-  };
-
   const handleCreatePayee = async (payeeData: unknown) => {
     try {
       const supabase = createClient();
@@ -486,21 +474,6 @@ export function BillPay() {
     } catch (err) {
       console.error("Failed to create payee:", err);
     }
-  };
-
-  const getFrequencyLabel = (frequency: string) => {
-    const preset = FREQUENCY_PRESETS.find((p) => p.value === frequency);
-    return preset ? preset.label : frequency;
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   if (loading) {
@@ -719,7 +692,33 @@ export function BillPay() {
                     )}
                   </form.Field>
 
-                  <form.Field name="amount">
+                  <form.Field
+                    name="amount"
+                    validators={{
+                      onChange: ({ value }) => {
+                        if (!value || value.trim() === "")
+                          return "Amount is required";
+                        const numValue = parseFloat(value);
+                        if (isNaN(numValue) || numValue <= 0)
+                          return "Amount must be greater than $0.00";
+                        if (numValue < 0.01)
+                          return "Amount must be at least $0.01";
+                        if (numValue > 9999999.99)
+                          return "Amount cannot exceed $9,999,999.99";
+
+                        // Check if amount exceeds source account balance
+                        const sourceAccount = accounts.find(
+                          (acc) =>
+                            acc.id === form.getFieldValue("source_account_id"),
+                        );
+                        if (sourceAccount && numValue > sourceAccount.balance) {
+                          return "Insufficient funds";
+                        }
+
+                        return undefined;
+                      },
+                    }}
+                  >
                     {(field) => (
                       <div className="space-y-2">
                         <label htmlFor="amount" className="text-sm font-medium">
@@ -755,7 +754,7 @@ export function BillPay() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {FREQUENCY_PRESETS.filter(
+                        {BILLPAY_FREQUENCY_PRESETS.filter(
                           (p) => p.value !== "custom",
                         ).map((preset) => (
                           <SelectItem key={preset.value} value={preset.value}>
@@ -1029,6 +1028,15 @@ export function BillPay() {
                   if (numValue < 0.01) return "Amount must be at least $0.01";
                   if (numValue > 9999999.99)
                     return "Amount cannot exceed $9,999,999.99";
+
+                  // Check if amount exceeds source account balance
+                  const sourceAccount = accounts.find(
+                    (acc) => acc.id === form.getFieldValue("source_account_id"),
+                  );
+                  if (sourceAccount && numValue > sourceAccount.balance) {
+                    return "Insufficient funds";
+                  }
+
                   return undefined;
                 },
               }}
@@ -1063,7 +1071,7 @@ export function BillPay() {
                   onValueChange={(value) => {
                     setFrequencyPreset(value);
                     if (value !== "custom") {
-                      const preset = FREQUENCY_PRESETS.find(
+                      const preset = BILLPAY_FREQUENCY_PRESETS.find(
                         (p) => p.value === value,
                       );
                       if (preset && preset.value !== "custom") {
@@ -1076,7 +1084,7 @@ export function BillPay() {
                     <SelectValue placeholder="Select frequency" />
                   </SelectTrigger>
                   <SelectContent>
-                    {FREQUENCY_PRESETS.map((preset) => (
+                    {BILLPAY_FREQUENCY_PRESETS.map((preset) => (
                       <SelectItem
                         key={preset.value}
                         value={
@@ -1173,100 +1181,39 @@ export function BillPay() {
             <form.Field name="source_account_id">
               {({ state: sourceState }) => (
                 <form.Field name="amount">
-                  {({ state: amountState }) => {
-                    const isDisabled =
-                      !sourceState.value ||
-                      sourceState.value === 0 ||
-                      !selectedPayeeId ||
-                      !amountState.value ||
-                      amountState.value.trim() === "" ||
-                      parseFloat(amountState.value) <= 0 ||
-                      amountState.meta.errors.length > 0 ||
-                      !form.getFieldValue("start_time");
-                    return (
-                      <Button
-                        type="submit"
-                        disabled={isDisabled}
-                        className="w-full"
-                      >
-                        Create Auto Payment Rule
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    );
-                  }}
+                  {({ state: amountState }) => (
+                    <form.Field name="start_time">
+                      {({ state: startTimeState }) => {
+                        const isDisabled =
+                          !sourceState.value ||
+                          sourceState.value === 0 ||
+                          !selectedPayeeId ||
+                          !amountState.value ||
+                          amountState.value.trim() === "" ||
+                          parseFloat(amountState.value) <= 0 ||
+                          amountState.meta.errors.length > 0 ||
+                          !startTimeState.value ||
+                          startTimeState.value.trim() === "" ||
+                          startTimeState.meta.errors.length > 0;
+                        return (
+                          <Button
+                            type="submit"
+                            disabled={isDisabled}
+                            className="w-full"
+                          >
+                            Create Auto Payment Rule
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        );
+                      }}
+                    </form.Field>
+                  )}
                 </form.Field>
               )}
             </form.Field>
           </form>
         </CardContent>
       </Card>
-
-      {rules.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Auto Payment Rules</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {rules.map((rule) => {
-                const payee = payees.find((p) => p.id === rule.payee_id);
-                const sourceAccount = accounts.find(
-                  (a) => a.id === rule.source_internal_id,
-                );
-                return (
-                  <div
-                    key={rule.id}
-                    className="flex items-center justify-between p-4 rounded-lg border bg-muted/30"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold">
-                          {formatCurrency(rule.amount)}
-                        </p>
-                        <Badge variant="secondary">
-                          {getFrequencyLabel(rule.frequency)}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        To: {payee?.business_name || "Unknown Payee"}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        From:{" "}
-                        {sourceAccount
-                          ? `****${sourceAccount.account_number.slice(-4)}`
-                          : "Unknown"}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Starts: {formatDate(rule.start_time)}
-                        {rule.end_time &&
-                          ` • Ends: ${formatDate(rule.end_time)}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditRule(rule.id)}
-                        className="text-primary hover:text-primary"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteRule(rule.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
@@ -1292,11 +1239,23 @@ function BillPayeeForm({
     account_number: "",
     routing_number: "",
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = () => {
-    const result = BillPayPayeeSchema.safeParse(formData);
+    // Ensure state is always CA
+    const dataToSubmit = { ...formData, state_or_territory: "CA" };
+    const result = BillPayPayeeSchema.safeParse(dataToSubmit);
     if (result.success) {
+      setErrors({});
       onSubmit(result.data);
+    } else {
+      // Extract and format validation errors
+      const formattedErrors: Record<string, string> = {};
+      result.error.issues.forEach((issue) => {
+        const path = issue.path.join(".");
+        formattedErrors[path] = issue.message;
+      });
+      setErrors(formattedErrors);
     }
   };
 
@@ -1304,70 +1263,134 @@ function BillPayeeForm({
     <div className="space-y-3 rounded-lg border bg-card p-4">
       <h3 className="font-medium">Create New Payee</h3>
       <div className="space-y-3">
-        <Input
-          placeholder="Business Name"
-          value={formData.business_name}
-          onChange={(e) =>
-            setFormData({ ...formData, business_name: e.target.value })
-          }
-          required
-        />
-        <Input
-          type="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          required
-        />
-        <Input
-          placeholder="Phone"
-          value={formData.phone}
-          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-          required
-        />
-        <Input
-          placeholder="Street Address"
-          value={formData.street_address}
-          onChange={(e) =>
-            setFormData({ ...formData, street_address: e.target.value })
-          }
-          required
-        />
+        <div>
+          <Input
+            placeholder="Business Name"
+            value={formData.business_name}
+            onChange={(e) => {
+              setFormData({ ...formData, business_name: e.target.value });
+              if (errors.business_name)
+                setErrors({ ...errors, business_name: "" });
+            }}
+            required
+          />
+          {errors.business_name && (
+            <p className="text-sm text-warning mt-1">{errors.business_name}</p>
+          )}
+        </div>
+        <div>
+          <Input
+            type="email"
+            placeholder="Email"
+            value={formData.email}
+            onChange={(e) => {
+              setFormData({ ...formData, email: e.target.value });
+              if (errors.email) setErrors({ ...errors, email: "" });
+            }}
+            required
+          />
+          {errors.email && (
+            <p className="text-sm text-warning mt-1">{errors.email}</p>
+          )}
+        </div>
+        <div>
+          <Input
+            placeholder="Phone"
+            value={formData.phone}
+            onChange={(e) => {
+              setFormData({ ...formData, phone: e.target.value });
+              if (errors.phone) setErrors({ ...errors, phone: "" });
+            }}
+            required
+          />
+          {errors.phone && (
+            <p className="text-sm text-warning mt-1">{errors.phone}</p>
+          )}
+        </div>
+        <div>
+          <Input
+            placeholder="Street Address"
+            value={formData.street_address}
+            onChange={(e) => {
+              setFormData({ ...formData, street_address: e.target.value });
+              if (errors.street_address)
+                setErrors({ ...errors, street_address: "" });
+            }}
+            required
+          />
+          {errors.street_address && (
+            <p className="text-sm text-warning mt-1">{errors.street_address}</p>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <Input
             placeholder="City"
             value={formData.city}
-            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, city: e.target.value });
+              if (errors.city) setErrors({ ...errors, city: "" });
+            }}
             required
           />
           <Input
             placeholder="Postal Code"
             value={formData.postal_code}
-            onChange={(e) =>
-              setFormData({ ...formData, postal_code: e.target.value })
-            }
+            onChange={(e) => {
+              setFormData({ ...formData, postal_code: e.target.value });
+              if (errors.postal_code) setErrors({ ...errors, postal_code: "" });
+            }}
             required
           />
         </div>
+        {errors.postal_code && (
+          <p className="text-sm text-warning">{errors.postal_code}</p>
+        )}
         <div className="grid grid-cols-2 gap-2">
-          <Input
-            placeholder="Account Number"
-            value={formData.account_number}
-            onChange={(e) =>
-              setFormData({ ...formData, account_number: e.target.value })
-            }
-            required
-          />
-          <Input
-            placeholder="Routing Number"
-            value={formData.routing_number}
-            onChange={(e) =>
-              setFormData({ ...formData, routing_number: e.target.value })
-            }
-            required
-            maxLength={9}
-          />
+          <div>
+            <Input
+              placeholder="Account Number"
+              value={formData.account_number}
+              onChange={(e) => {
+                setFormData({ ...formData, account_number: e.target.value });
+                if (errors.account_number)
+                  setErrors({ ...errors, account_number: "" });
+              }}
+              required
+              maxLength={17}
+            />
+            {errors.account_number && (
+              <p className="text-sm text-warning mt-1">
+                {errors.account_number}
+              </p>
+            )}
+          </div>
+          <div>
+            <Input
+              placeholder="Routing Number"
+              value={formData.routing_number}
+              onChange={(e) => {
+                setFormData({ ...formData, routing_number: e.target.value });
+                if (errors.routing_number)
+                  setErrors({ ...errors, routing_number: "" });
+              }}
+              required
+              maxLength={9}
+            />
+            {errors.routing_number && (
+              <p className="text-sm text-warning mt-1">
+                {errors.routing_number}
+              </p>
+            )}
+          </div>
         </div>
+        {Object.keys(errors).length > 0 && (
+          <div
+            className="rounded-md bg-destructive/20 border border-destructive/50 p-3 text-sm text-destructive"
+            role="alert"
+          >
+            Please fix the errors above before submitting.
+          </div>
+        )}
         <div className="flex gap-2">
           <Button type="button" onClick={handleSubmit} className="flex-1">
             Create

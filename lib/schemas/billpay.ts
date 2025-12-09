@@ -32,8 +32,13 @@ const AccountNumberSchema = z
 // Routing number validation (exactly 9 digits)
 const RoutingNumberSchema = z
   .string()
-  .length(9, "Routing number must be exactly 9 digits")
-  .regex(/^\d{9}$/, "Routing number must contain only digits");
+  .min(1, "Routing number is required")
+  .refine((val) => /^\d+$/.test(val), {
+    message: "Routing number must contain only digits (0-9)",
+  })
+  .refine((val) => val.length === 9, {
+    message: "Routing number must be exactly 9 digits",
+  });
 
 // US State/Territory enum (matching schema.prisma)
 const USStateTerritorySchema = z.enum([

@@ -1,8 +1,7 @@
 "use server";
 
 import { getPrisma } from "@/app/lib/prisma";
-import { getAuthUserFromRequest } from "@/lib/auth";
-import { headers } from "next/headers";
+import { createClient } from "@/utils/supabase/server";
 import { User, Transaction, InternalAccount } from "@prisma/client";
 
 // Use Prisma generated types with select fields
@@ -83,20 +82,18 @@ export type DetailedTransaction = Pick<
 // Helper function to verify manager role
 async function verifyManagerRole(): Promise<boolean> {
   try {
-    const headersList = await headers();
-    const authResult = await getAuthUserFromRequest(
-      new Request("http://localhost", {
-        headers: headersList,
-      }),
-    );
+    const supabase = await createClient();
+    const {
+      data: { user: supabaseUser },
+    } = await supabase.auth.getUser();
 
-    if (!authResult.ok) {
+    if (!supabaseUser) {
       return false;
     }
 
     const prisma = getPrisma();
     const user = await prisma.user.findUnique({
-      where: { auth_user_id: authResult.supabaseUser.id },
+      where: { auth_user_id: supabaseUser.id },
       select: { role: true },
     });
 
@@ -413,4 +410,179 @@ export async function getUserTransactions(
   }));
 
   return transactionsWithNumbers;
+}
+
+// Generate unique account number (shared utility)
+async function generateUniqueAccountNumber(): Promise<string> {
+  const maxAttempts = 10;
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    // Generate 17-digit account number
+    const accountNumber = Array.from({ length: 17 }, () =>
+      Math.floor(Math.random() * 10),
+    ).join("");
+
+    // Check if account number exists
+    const existing = await getPrisma().internalAccount.findUnique({
+      where: { account_number: accountNumber },
+    });
+
+    if (!existing) {
+      return accountNumber;
+    }
+
+    attempts++;
+  }
+
+  throw new Error(
+    "Failed to generate unique account number after multiple attempts",
+  );
+}
+
+// Open account for a user (manager only)
+export async function openAccountForUser(
+  userId: number,
+  accountType: "checking" | "savings",
+  initialDeposit?: number,
+): Promise<{
+  success: boolean;
+  account?: {
+    id: number;
+    account_number: string;
+    routing_number: string;
+    account_type: "checking" | "savings";
+    balance: number;
+    is_active: boolean;
+    created_at: Date;
+  };
+  error?: string;
+}> {
+  const isManager = await verifyManagerRole();
+  if (!isManager) {
+    return {
+      success: false,
+      error: "Unauthorized: Manager role required",
+    };
+  }
+
+  const prisma = getPrisma();
+
+  // Verify user exists
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    return {
+      success: false,
+      error: "User not found",
+    };
+  }
+
+  // Validate account type
+  if (!["checking", "savings"].includes(accountType)) {
+    return {
+      success: false,
+      error: "Invalid account type",
+    };
+  }
+
+  try {
+    const accountNumber = await generateUniqueAccountNumber();
+
+    // Create account
+    const account = await prisma.internalAccount.create({
+      data: {
+        account_type: accountType,
+        account_number: accountNumber,
+        balance: initialDeposit || 0,
+        user_id: userId,
+        is_active: true,
+      },
+    });
+
+    // Invalidate cache for the user
+    const { revalidateTag } = await import("next/cache");
+    await revalidateTag(`user-${user.id}`);
+    await revalidateTag(`accounts-${user.id}`);
+
+    return {
+      success: true,
+      account: {
+        id: account.id,
+        account_number: account.account_number,
+        routing_number: account.routing_number,
+        account_type: account.account_type,
+        balance: Number(account.balance),
+        is_active: account.is_active,
+        created_at: account.created_at,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to create account",
+    };
+  }
+}
+
+// Close account for a user (manager only)
+export async function closeAccountForUser(accountId: number): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const isManager = await verifyManagerRole();
+  if (!isManager) {
+    return {
+      success: false,
+      error: "Unauthorized: Manager role required",
+    };
+  }
+
+  const prisma = getPrisma();
+
+  try {
+    // Get account with user info for cache invalidation
+    const account = await prisma.internalAccount.findUnique({
+      where: { id: accountId },
+      select: { user_id: true, balance: true },
+    });
+
+    if (!account) {
+      return {
+        success: false,
+        error: "Account not found",
+      };
+    }
+
+    // Check if account has zero balance
+    if (Number(account.balance) !== 0) {
+      return {
+        success: false,
+        error: "Account must have zero balance before closing",
+      };
+    }
+
+    // Update account to inactive
+    await prisma.internalAccount.update({
+      where: { id: accountId },
+      data: { is_active: false },
+    });
+
+    // Invalidate cache for the user
+    const { revalidateTag } = await import("next/cache");
+    await revalidateTag(`user-${account.user_id}`);
+    await revalidateTag(`accounts-${account.user_id}`);
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to close account",
+    };
+  }
 }

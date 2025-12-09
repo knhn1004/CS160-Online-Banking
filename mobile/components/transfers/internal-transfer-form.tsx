@@ -416,6 +416,9 @@ export function InternalTransferForm() {
         const sourceAccountId = formValues[0] as number | null;
         const destinationAccountId = formValues[1] as number | null;
         const amount = formValues[2] as string;
+
+
+
         const isFormValid =
           sourceAccountId &&
           destinationAccountId &&
@@ -445,7 +448,7 @@ export function InternalTransferForm() {
                     selectedAccountId={field.state.value}
                     onSelect={field.handleChange}
                     label="From Account"
-                    excludeAccountId={destinationAccountId || undefined}
+                    //excludeAccountId={destinationAccountId || undefined}
                     error={
                       field.state.meta.errors.length > 0
                         ? field.state.meta.errors[0]
@@ -475,7 +478,7 @@ export function InternalTransferForm() {
                     selectedAccountId={field.state.value}
                     onSelect={field.handleChange}
                     label="To Account"
-                    excludeAccountId={sourceAccountId || undefined}
+                    //excludeAccountId={sourceAccountId || undefined}
                     error={
                       field.state.meta.errors.length > 0
                         ? field.state.meta.errors[0]

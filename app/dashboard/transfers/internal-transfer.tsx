@@ -385,112 +385,121 @@ export function InternalTransfer() {
             }}
             className="space-y-6"
           >
-            <form.Field
-              name="source_account_id"
-              validators={{
-                onChange: ({ value }) => {
-                  if (!value) return "Source account is required";
-                  return undefined;
-                },
-              }}
-            >
-              {(field) => (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="source_account_id"
-                    className="text-sm font-medium"
-                  >
-                    From Account
-                  </label>
-                  <Select
-                    value={
-                      field.state.value && field.state.value > 0
-                        ? field.state.value.toString()
-                        : ""
-                    }
-                    onValueChange={(value) =>
-                      field.handleChange(parseInt(value))
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select source account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((account) => (
-                        <SelectItem
-                          key={account.id}
-                          value={account.id.toString()}
-                        >
-                          {`${account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1)} ****${account.account_number.slice(-4)} - ${formatCurrency(account.balance)}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {field.state.meta.errors.length > 0 && (
-                    <p className="text-sm text-warning">
-                      {field.state.meta.errors[0]}
-                    </p>
+            <form.Field name="destination_account_id">
+              {(destField) => (
+                <form.Field
+                  name="source_account_id"
+                  validators={{
+                    onChange: ({ value }) => {
+                      if (!value) return "Source account is required";
+                      return undefined;
+                    },
+                  }}
+                >
+                  {(field) => (
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="source_account_id"
+                        className="text-sm font-medium"
+                      >
+                        From Account
+                      </label>
+                      <Select
+                        value={
+                          field.state.value && field.state.value > 0
+                            ? field.state.value.toString()
+                            : ""
+                        }
+                        onValueChange={(value) => {
+                          const selectedId = parseInt(value);
+                          field.handleChange(selectedId);
+                          // Clear destination if same account selected
+                          if (selectedId === destField.state.value) {
+                            destField.handleChange(0);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select source account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((account) => (
+                            <SelectItem
+                              key={account.id}
+                              value={account.id.toString()}
+                            >
+                              {`${account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1)} ****${account.account_number.slice(-4)} - ${formatCurrency(account.balance)}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {field.state.meta.errors.length > 0 && (
+                        <p className="text-sm text-warning">
+                          {field.state.meta.errors[0]}
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
+                </form.Field>
               )}
             </form.Field>
 
-            <form.Field
-              name="destination_account_id"
-              validators={{
-                onChange: ({ value }) => {
-                  if (!value) return "Destination account is required";
-                  if (value === form.getFieldValue("source_account_id")) {
-                    return "Destination account must be different from source account";
-                  }
-                  return undefined;
-                },
-              }}
-            >
-              {(field) => (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="destination_account_id"
-                    className="text-sm font-medium"
-                  >
-                    To Account
-                  </label>
-                  <Select
-                    value={
-                      field.state.value && field.state.value > 0
-                        ? field.state.value.toString()
-                        : ""
-                    }
-                    onValueChange={(value) =>
-                      field.handleChange(parseInt(value))
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select destination account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts
-                        .filter(
-                          (account) =>
-                            account.id !==
-                            form.getFieldValue("source_account_id"),
-                        )
-                        .map((account) => (
-                          <SelectItem
-                            key={account.id}
-                            value={account.id.toString()}
-                          >
-                            {`${account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1)} ****${account.account_number.slice(-4)} - ${formatCurrency(account.balance)}`}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {field.state.meta.errors.length > 0 && (
-                    <p className="text-sm text-warning">
-                      {field.state.meta.errors[0]}
-                    </p>
+            <form.Field name="source_account_id">
+              {(sourceField) => (
+                <form.Field
+                  name="destination_account_id"
+                  validators={{
+                    onChange: ({ value }) => {
+                      if (!value) return "Destination account is required";
+                      return undefined;
+                    },
+                  }}
+                >
+                  {(field) => (
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="destination_account_id"
+                        className="text-sm font-medium"
+                      >
+                        To Account
+                      </label>
+                      <Select
+                        value={
+                          field.state.value && field.state.value > 0
+                            ? field.state.value.toString()
+                            : ""
+                        }
+                        onValueChange={(value) => {
+                          const selectedId = parseInt(value);
+                          field.handleChange(selectedId);
+                          // Clear source if same account selected
+                          if (selectedId === sourceField.state.value) {
+                            sourceField.handleChange(0);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select destination account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((account) => (
+                            <SelectItem
+                              key={account.id}
+                              value={account.id.toString()}
+                            >
+                              {`${account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1)} ****${account.account_number.slice(-4)} - ${formatCurrency(account.balance)}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {field.state.meta.errors.length > 0 && (
+                        <p className="text-sm text-warning">
+                          {field.state.meta.errors[0]}
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
+                </form.Field>
               )}
             </form.Field>
 

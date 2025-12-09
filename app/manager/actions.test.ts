@@ -5,6 +5,8 @@ import {
   getTransactions,
   getTransactionById,
   getUserTransactions,
+  openAccountForUser,
+  closeAccountForUser,
 } from "./actions";
 
 // Mock Prisma client
@@ -19,6 +21,11 @@ const mockPrisma = {
     findMany: vi.fn(),
     count: vi.fn(),
   },
+  internalAccount: {
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+  },
 };
 
 // Mock getPrisma function
@@ -26,28 +33,32 @@ vi.mock("@/app/lib/prisma", () => ({
   getPrisma: () => mockPrisma,
 }));
 
-// Mock auth functions
-vi.mock("@/lib/auth", () => ({
-  getAuthUserFromRequest: vi.fn(),
+// Mock Supabase server client
+const mockSupabaseClient = {
+  auth: {
+    getUser: vi.fn(),
+  },
+};
+
+vi.mock("@/utils/supabase/server", () => ({
+  createClient: vi.fn(async () => mockSupabaseClient),
 }));
 
-// Mock headers
-vi.mock("next/headers", () => ({
-  headers: vi.fn(),
+// Mock next/cache
+vi.mock("next/cache", () => ({
+  revalidateTag: vi.fn(),
 }));
-
-import { getAuthUserFromRequest } from "@/lib/auth";
-import { headers } from "next/headers";
 
 describe("Manager Actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Mock successful auth by default
-    vi.mocked(getAuthUserFromRequest).mockResolvedValue({
-      ok: true,
-      supabaseUser: { id: "test-user-id", email: "manager@test.com" },
+    vi.mocked(mockSupabaseClient.auth.getUser).mockResolvedValue({
+      data: {
+        user: { id: "test-user-id", email: "manager@test.com" },
+      },
+      error: null,
     });
-    vi.mocked(headers).mockResolvedValue(new Headers());
   });
 
   afterEach(() => {
@@ -133,10 +144,9 @@ describe("Manager Actions", () => {
     });
 
     it("should throw error when auth fails", async () => {
-      vi.mocked(getAuthUserFromRequest).mockResolvedValue({
-        ok: false,
-        status: 401,
-        body: { message: "Unauthorized" },
+      vi.mocked(mockSupabaseClient.auth.getUser).mockResolvedValue({
+        data: { user: null },
+        error: { message: "Unauthorized", status: 401 },
       });
 
       await expect(getUsers({ page: 1, limit: 10 })).rejects.toThrow(
@@ -416,6 +426,175 @@ describe("Manager Actions", () => {
       await expect(getUserTransactions(1)).rejects.toThrow(
         "Unauthorized: Manager role required",
       );
+    });
+  });
+
+  describe("openAccountForUser", () => {
+    it("should open account for user when manager is authenticated", async () => {
+      const mockUser = {
+        id: 1,
+        username: "testuser",
+        email: "test@example.com",
+      };
+      const mockAccount = {
+        id: 1,
+        account_number: "12345678901234567",
+        routing_number: "724722907",
+        account_type: "checking" as const,
+        balance: 0,
+        is_active: true,
+        created_at: new Date("2023-01-01"),
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue({
+        role: "bank_manager",
+      });
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        role: "bank_manager",
+      });
+      mockPrisma.user.findUnique.mockResolvedValueOnce(mockUser);
+      mockPrisma.internalAccount.findUnique.mockResolvedValue(null);
+      mockPrisma.internalAccount.create.mockResolvedValue(mockAccount);
+
+      const result = await openAccountForUser(1, "checking", 100);
+
+      expect(result.success).toBe(true);
+      expect(result.account).toBeDefined();
+      expect(result.account?.account_type).toBe("checking");
+      expect(mockPrisma.internalAccount.create).toHaveBeenCalled();
+    });
+
+    it("should return error when user is not a manager", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ role: "customer" });
+
+      const result = await openAccountForUser(1, "checking");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Unauthorized: Manager role required");
+    });
+
+    it("should return error when user not found", async () => {
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        role: "bank_manager",
+      });
+      mockPrisma.user.findUnique.mockResolvedValueOnce(null);
+
+      const result = await openAccountForUser(999, "checking");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("User not found");
+    });
+
+    it("should return error for invalid account type", async () => {
+      const mockUser = { id: 1 };
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        role: "bank_manager",
+      });
+      mockPrisma.user.findUnique.mockResolvedValueOnce(mockUser);
+
+      const result = await openAccountForUser(
+        1,
+        "invalid" as "checking" | "savings",
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Invalid account type");
+    });
+
+    it("should create account with initial deposit", async () => {
+      const mockUser = { id: 1 };
+      const mockAccount = {
+        id: 1,
+        account_number: "12345678901234567",
+        routing_number: "724722907",
+        account_type: "savings" as const,
+        balance: 500,
+        is_active: true,
+        created_at: new Date("2023-01-01"),
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        role: "bank_manager",
+      });
+      mockPrisma.user.findUnique.mockResolvedValueOnce(mockUser);
+      mockPrisma.internalAccount.findUnique.mockResolvedValue(null);
+      mockPrisma.internalAccount.create.mockResolvedValue(mockAccount);
+
+      const result = await openAccountForUser(1, "savings", 500);
+
+      expect(result.success).toBe(true);
+      expect(mockPrisma.internalAccount.create).toHaveBeenCalledWith({
+        data: {
+          account_type: "savings",
+          account_number: expect.any(String),
+          balance: 500,
+          user_id: 1,
+          is_active: true,
+        },
+      });
+    });
+  });
+
+  describe("closeAccountForUser", () => {
+    it("should close account when manager is authenticated and balance is zero", async () => {
+      const mockAccount = {
+        id: 1,
+        user_id: 1,
+        balance: 0,
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue({ role: "bank_manager" });
+      mockPrisma.internalAccount.findUnique.mockResolvedValue(mockAccount);
+      mockPrisma.internalAccount.update.mockResolvedValue({
+        ...mockAccount,
+        is_active: false,
+      });
+
+      const result = await closeAccountForUser(1);
+
+      expect(result.success).toBe(true);
+      expect(mockPrisma.internalAccount.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { is_active: false },
+      });
+    });
+
+    it("should return error when user is not a manager", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ role: "customer" });
+
+      const result = await closeAccountForUser(1);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Unauthorized: Manager role required");
+    });
+
+    it("should return error when account not found", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ role: "bank_manager" });
+      mockPrisma.internalAccount.findUnique.mockResolvedValue(null);
+
+      const result = await closeAccountForUser(999);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Account not found");
+    });
+
+    it("should return error when account balance is not zero", async () => {
+      const mockAccount = {
+        id: 1,
+        user_id: 1,
+        balance: 100,
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue({ role: "bank_manager" });
+      mockPrisma.internalAccount.findUnique.mockResolvedValue(mockAccount);
+
+      const result = await closeAccountForUser(1);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        "Account must have zero balance before closing",
+      );
+      expect(mockPrisma.internalAccount.update).not.toHaveBeenCalled();
     });
   });
 });

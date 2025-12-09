@@ -22,8 +22,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, ArrowRight, Filter, Search } from "lucide-react";
-import { TransferHistoryItem } from "@/lib/schemas/transfer";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Filter,
+  Search,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import type {
+  InternalAccountResponse,
+  TransferHistoryItem,
+} from "@/lib/schemas/transfer";
+import { formatCurrency as formatUsd } from "@/lib/utils";
+import type { BillPayRule, BillPayPayee } from "../billpay-types";
+import { getBillPayFrequencyLabel } from "../billpay-constants";
 import { Breadcrumbs } from "../breadcrumbs";
 
 interface TransferHistoryResponse {
@@ -38,6 +51,7 @@ interface TransferHistoryResponse {
 
 export default function TransferHistoryPage() {
   const router = useRouter();
+  const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [transfers, setTransfers] = useState<TransferHistoryItem[]>([]);
   const [pagination, setPagination] = useState({
@@ -52,6 +66,13 @@ export default function TransferHistoryPage() {
     end_date: "",
   });
   const [error, setError] = useState<string | null>(null);
+  const [billPayRules, setBillPayRules] = useState<BillPayRule[]>([]);
+  const [billPayPayees, setBillPayPayees] = useState<BillPayPayee[]>([]);
+  const [billPayAccounts, setBillPayAccounts] = useState<
+    InternalAccountResponse[]
+  >([]);
+  const [billPayLoading, setBillPayLoading] = useState(true);
+  const [billPayError, setBillPayError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -63,6 +84,7 @@ export default function TransferHistoryPage() {
       if (!user) {
         router.push("/login");
       } else {
+        setAuthReady(true);
         setLoading(false);
       }
     };
@@ -128,11 +150,73 @@ export default function TransferHistoryPage() {
     }
   }, [pagination.page, pagination.limit, filters]);
 
+  const fetchBillPayData = useCallback(async () => {
+    try {
+      setBillPayLoading(true);
+      setBillPayError(null);
+
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        setBillPayError("Not authenticated");
+        return;
+      }
+
+      const headers = {
+        Authorization: `Bearer ${session.access_token}`,
+      };
+
+      const [rulesResponse, payeesResponse, accountsResponse] =
+        await Promise.all([
+          fetch("/api/billpay/rules", { headers }),
+          fetch("/api/billpay/payees", { headers }),
+          fetch("/api/accounts/internal", { headers }),
+        ]);
+
+      if (!rulesResponse.ok) {
+        throw new Error("Failed to load bill pay rules");
+      }
+      if (!payeesResponse.ok) {
+        throw new Error("Failed to load bill pay payees");
+      }
+      if (!accountsResponse.ok) {
+        throw new Error("Failed to load accounts");
+      }
+
+      const [{ rules }, { payees }, { accounts }] = await Promise.all([
+        rulesResponse.json() as Promise<{ rules: BillPayRule[] }>,
+        payeesResponse.json() as Promise<{ payees: BillPayPayee[] }>,
+        accountsResponse.json() as Promise<{
+          accounts: InternalAccountResponse[];
+        }>,
+      ]);
+
+      setBillPayRules(rules);
+      setBillPayPayees(payees);
+      setBillPayAccounts(accounts.filter((account) => account.is_active));
+    } catch (err) {
+      setBillPayError(
+        err instanceof Error ? err.message : "Failed to load bill pay rules",
+      );
+    } finally {
+      setBillPayLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!loading) {
+    if (authReady) {
       fetchTransfers();
     }
-  }, [pagination.page, pagination.limit, filters, loading, fetchTransfers]);
+  }, [authReady, pagination.page, pagination.limit, filters, fetchTransfers]);
+
+  useEffect(() => {
+    if (authReady) {
+      fetchBillPayData();
+    }
+  }, [authReady, fetchBillPayData]);
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -143,7 +227,52 @@ export default function TransferHistoryPage() {
     setPagination((prev) => ({ ...prev, page: newPage }));
   };
 
-  const formatCurrency = (amount: number) => {
+  const handleRuleEditNavigate = useCallback(
+    (ruleId: number) => {
+      router.push(`/dashboard/transfers?tab=billpay&editRule=${ruleId}`);
+    },
+    [router],
+  );
+
+  const handleDeleteRule = useCallback(
+    async (ruleId: number) => {
+      if (!confirm("Are you sure you want to delete this bill pay rule?")) {
+        return;
+      }
+
+      try {
+        const supabase = createClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+          throw new Error("Not authenticated");
+        }
+
+        const response = await fetch(`/api/billpay/rules/${ruleId}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const data = (await response.json()) as { error?: string };
+          throw new Error(data.error || "Failed to delete bill pay rule");
+        }
+
+        fetchBillPayData();
+      } catch (err) {
+        setBillPayError(
+          err instanceof Error ? err.message : "Failed to delete bill pay rule",
+        );
+      }
+    },
+    [fetchBillPayData],
+  );
+
+  const formatTransferAmount = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -348,7 +477,7 @@ export default function TransferHistoryPage() {
                           }
                         >
                           {transfer.direction === "outbound" ? "-" : "+"}
-                          {formatCurrency(Math.abs(transfer.amount))}
+                          {formatTransferAmount(Math.abs(transfer.amount))}
                         </TableCell>
                         <TableCell>{getStatusBadge(transfer.status)}</TableCell>
                       </TableRow>
@@ -389,6 +518,86 @@ export default function TransferHistoryPage() {
                 </div>
               )}
             </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6 mt-6">
+        <CardHeader>
+          <CardTitle>Active Auto Payment Rules</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {billPayLoading ? (
+            <p className="text-sm text-muted-foreground">Loading rules…</p>
+          ) : billPayError ? (
+            <div className="flex flex-col gap-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive md:flex-row md:items-center md:justify-between">
+              <span>{billPayError}</span>
+              <Button variant="outline" size="sm" onClick={fetchBillPayData}>
+                Try again
+              </Button>
+            </div>
+          ) : billPayRules.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No active auto payment rules yet.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {billPayRules.map((rule) => {
+                const payee = billPayPayees.find((p) => p.id === rule.payee_id);
+                const sourceAccount = billPayAccounts.find(
+                  (account) => account.id === rule.source_internal_id,
+                );
+                return (
+                  <div
+                    key={rule.id}
+                    className="flex items-center justify-between rounded-lg border bg-muted/30 p-4"
+                  >
+                    <div className="flex-1">
+                      <div className="mb-1 flex items-center gap-2">
+                        <p className="font-semibold">
+                          {formatUsd(rule.amount)}
+                        </p>
+                        <Badge variant="secondary">
+                          {getBillPayFrequencyLabel(rule.frequency)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        To: {payee?.business_name || "Unknown Payee"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        From:{" "}
+                        {sourceAccount
+                          ? `****${sourceAccount.account_number.slice(-4)}`
+                          : "Unknown"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Starts: {formatDate(rule.start_time)}
+                        {rule.end_time &&
+                          ` • Ends: ${formatDate(rule.end_time)}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRuleEditNavigate(rule.id)}
+                        className="text-primary hover:text-primary"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteRule(rule.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>

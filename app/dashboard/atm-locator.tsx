@@ -365,7 +365,7 @@ export function AtmLocator() {
               </Map>
             </APIProvider>
           ) : (
-            <div className="flex h-full items-center justify-center text-gray-500">
+            <div className="flex h-full items-center justify-center text-muted-foreground">
               <div className="text-center">
                 <p className="mb-2">Google Maps API key not configured</p>
                 <p className="text-sm">
@@ -387,8 +387,8 @@ export function AtmLocator() {
             <div className="space-y-3 flex-1">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="animate-pulse rounded-lg border p-4">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                  <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                  <div className="h-3 bg-muted rounded w-1/2"></div>
                 </div>
               ))}
             </div>
@@ -399,8 +399,8 @@ export function AtmLocator() {
                   key={atm.place_id}
                   className={`rounded-lg border p-4 cursor-pointer transition-colors ${
                     selectedAtm?.place_id === atm.place_id
-                      ? "border-blue-500 bg-blue-50"
-                      : "hover:bg-gray-50"
+                      ? "border-primary bg-primary/10"
+                      : "hover:bg-accent/50"
                   }`}
                   onClick={() => {
                     setSelectedAtm(atm);
@@ -409,14 +409,18 @@ export function AtmLocator() {
                   }}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-sm">{atm.name}</h4>
-                    <span className="text-xs text-gray-500">
+                    <h4 className="font-medium text-sm text-foreground">
+                      {atm.name}
+                    </h4>
+                    <span className="text-xs text-muted-foreground">
                       {formatDistance(atm.distance)}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-600 mb-2">{atm.vicinity}</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {atm.vicinity}
+                  </p>
                   {atm.rating && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>
                         ⭐ {formatRating(atm.rating, atm.user_ratings_total)}
                       </span>
@@ -427,7 +431,7 @@ export function AtmLocator() {
             </div>
           ) : (
             !loading && (
-              <div className="flex-1 flex items-center justify-center text-center py-8 text-gray-500">
+              <div className="flex-1 flex items-center justify-center text-center py-8 text-muted-foreground">
                 <div>
                   <p>No Chase ATMs found in this area.</p>
                   <p className="text-sm">Try searching a different location.</p>
@@ -437,26 +441,6 @@ export function AtmLocator() {
           )}
         </div>
       </div>
-
-      {/* Selected ATM Details */}
-      {selectedAtm && (
-        <div className="rounded-lg border bg-gray-50 p-4">
-          <h4 className="font-semibold mb-2">{selectedAtm.name}</h4>
-          <p className="text-sm text-gray-600 mb-2">{selectedAtm.vicinity}</p>
-          <div className="flex justify-between text-sm">
-            <span>Distance: {formatDistance(selectedAtm.distance)}</span>
-            {selectedAtm.rating && (
-              <span>
-                Rating:{" "}
-                {formatRating(
-                  selectedAtm.rating,
-                  selectedAtm.user_ratings_total,
-                )}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

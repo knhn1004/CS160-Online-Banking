@@ -25,15 +25,58 @@ export type UserProfile = {
 export async function getAuthUserFromRequest(
   request: Request,
 ): Promise<AuthResult> {
-  const authHeader = request.headers.get("authorization") ?? undefined;
-  const supabase = await createClient(authHeader);
-  const bearer = authHeader?.replace(/^Bearer\s+/i, "");
-  const userResult = bearer
-    ? await supabase.auth.getUser(bearer)
-    : await supabase.auth.getUser();
-  const { user } = userResult.data;
-  if (!user) {
+  // Check for authorization header (case-insensitive)
+  const authHeader =
+    request.headers.get("authorization") ||
+    request.headers.get("Authorization");
+
+  if (!authHeader) {
     return { ok: false, status: 401, body: { message: "Unauthorized" } };
   }
-  return { ok: true, supabaseUser: { id: user.id, email: user.email } };
+
+  // Extract bearer token
+  const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!bearerMatch) {
+    return {
+      ok: false,
+      status: 401,
+      body: { message: "Invalid authorization header format" },
+    };
+  }
+
+  const token = bearerMatch[1];
+
+  try {
+    // Create Supabase client with the token in global headers for stateless auth
+    const supabase = await createClient(authHeader);
+
+    // Validate the token by getting the user
+    // Pass token directly to getUser() for stateless auth (mobile apps)
+    // Global headers alone may not be sufficient for getUser() in SSR
+    const userResult = await supabase.auth.getUser(token);
+
+    // Check for errors first
+    if (userResult.error) {
+      console.error("Auth error:", userResult.error.message);
+      return {
+        ok: false,
+        status: 401,
+        body: { message: userResult.error.message || "Unauthorized" },
+      };
+    }
+
+    const { user } = userResult.data;
+    if (!user) {
+      return { ok: false, status: 401, body: { message: "Unauthorized" } };
+    }
+
+    return { ok: true, supabaseUser: { id: user.id, email: user.email } };
+  } catch (error) {
+    console.error("Unexpected error during authentication:", error);
+    return {
+      ok: false,
+      status: 500,
+      body: { message: "Internal server error during authentication" },
+    };
+  }
 }
