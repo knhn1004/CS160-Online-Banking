@@ -234,7 +234,7 @@ describe("ATM Actions", () => {
           results: [
             {
               place_id: "1",
-              name: "Test ATM",
+              name: "Chase ATM",
               vicinity: "Test Address",
               geometry: {
                 location: {
