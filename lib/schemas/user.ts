@@ -85,12 +85,35 @@ export const SignupSchema = z
       .regex(/[a-z]/, "Password must contain at least one lowercase letter")
       .regex(/[0-9]/, "Password must contain at least one number"),
     confirmPassword: z.string(),
-    firstName: z.string().min(1, "First name is required"),
-    lastName: z.string().min(1, "Last name is required"),
+    firstName: z
+      .string()
+      .min(1, "First name is required")
+      .regex(
+        /^[a-zA-Z\s'-]+$/,
+        "First name can only contain letters, spaces, hyphens, and apostrophes",
+      ),
+    lastName: z
+      .string()
+      .min(1, "Last name is required")
+      .regex(
+        /^[a-zA-Z\s'-]+$/,
+        "Last name can only contain letters, spaces, hyphens, and apostrophes",
+      ),
     phoneNumber: z
       .string()
-      .min(10, "Phone number must contain at least 10 digits")
-      .regex(/\d/, "Phone number must contain digits"),
+      .min(1, "Phone number is required")
+      .max(14, "Phone number is too long")
+      .refine(
+        (phone) => {
+          // Extract digits only (user enters only the 10 digits after +1)
+          const digits = phone.replace(/\D/g, "");
+          // Must have exactly 10 digits
+          return digits.length === 10;
+        },
+        {
+          message: "Phone number must contain exactly 10 digits",
+        },
+      ),
     streetAddress: z.string().min(1, "Street address is required"),
     addressLine2: z.string().optional(),
     city: z.string().min(1, "City is required"),

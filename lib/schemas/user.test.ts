@@ -128,6 +128,86 @@ describe("SignupSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("should reject first name with numbers", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      firstName: "John123",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject first name with special characters", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      firstName: "John@Doe",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should accept first name with hyphen", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      firstName: "Mary-Jane",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept first name with apostrophe", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      firstName: "O'Brien",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept first name with space", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      firstName: "Mary Jane",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject last name with numbers", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      lastName: "Doe123",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject last name with special characters", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      lastName: "Doe@Smith",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should accept last name with hyphen", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      lastName: "Smith-Jones",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept last name with apostrophe", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      lastName: "O'Connor",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept last name with space", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      lastName: "Van Der Berg",
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("should accept phone number with formatting", () => {
     const result = SignupSchema.safeParse({
       ...validSignupData,
@@ -150,6 +230,54 @@ describe("SignupSchema", () => {
       phoneNumber: "555-123-4567",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("should reject phone number with 11 digits", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "15551234567",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject phone number with 11 digits and formatting", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "1 (555) 123-4567",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject phone number longer than 20 characters", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "123456789012345678901", // 21 characters
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject phone number with more than 10 digits", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "12345678901", // 11 digits
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject phone number with 12 digits", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "123456789012", // 12 digits
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject phone number with less than 10 digits", () => {
+    const result = SignupSchema.safeParse({
+      ...validSignupData,
+      phoneNumber: "123456789", // 9 digits
+    });
+    expect(result.success).toBe(false);
   });
 
   it("should reject invalid postal code", () => {

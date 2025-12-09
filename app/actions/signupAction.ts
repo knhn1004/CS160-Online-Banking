@@ -31,13 +31,20 @@ export async function signupAction(formData: FormData) {
 
   const normalizePhone = (phone?: string | null): string | null => {
     if (!phone) return null;
+    // Extract digits only (user enters only the 10 digits after +1)
     const digits = phone.replace(/\D/g, "");
+    // Must have exactly 10 digits
     if (digits.length === 10) return `+1${digits}`;
-    if (digits.length === 11 && digits.startsWith("1"))
-      return `+1${digits.slice(-10)}`;
     return null;
   };
   const normalizedPhone = normalizePhone(p.phoneNumber);
+
+  // Validate phone number was successfully normalized (must be exactly 12 chars: +1XXXXXXXXXX)
+  if (!normalizedPhone || normalizedPhone.length !== 12) {
+    return redirect(
+      `/signup?error=${encodeURIComponent("Invalid phone number format. Please enter a valid 10-digit US phone number.")}`,
+    );
+  }
 
   // Check for existing user conflicts
   const conflict = await prisma.user.findFirst({
@@ -102,7 +109,7 @@ export async function signupAction(formData: FormData) {
         firstName: p.firstName ?? null,
         lastName: p.lastName ?? null,
         email: p.email ?? null,
-        phoneNumber: p.phoneNumber ?? null,
+        phoneNumber: normalizedPhone, // Use normalized phone (guaranteed to be E.164 format, 12 chars)
         streetAddress: p.streetAddress ?? null,
         addressLine2: p.addressLine2 ?? null,
         city: p.city ?? null,
