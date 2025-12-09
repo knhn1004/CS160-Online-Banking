@@ -234,7 +234,7 @@ describe("ATM Actions", () => {
           results: [
             {
               place_id: "1",
-              name: "Test ATM",
+              name: "Chase ATM",
               vicinity: "Test Address",
               geometry: {
                 location: {
@@ -254,21 +254,24 @@ describe("ATM Actions", () => {
     });
 
     it("should handle same coordinates (zero distance)", async () => {
-      (fetch as Mock).mockResolvedValueOnce({
+      // Mock the fetch to return a Chase ATM at the exact search coordinates.
+      global.fetch = vi.fn().mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           status: "OK",
           results: [
             {
-              place_id: "1",
-              name: "Test ATM",
-              vicinity: "Test Address",
+              place_id: "test123",
+              name: "Chase ATM",
+              vicinity: "123 Main St",
               geometry: {
                 location: {
-                  lat: 37.7749, // Same coordinates
+                  lat: 37.7749,
                   lng: -122.4194,
                 },
               },
+              rating: 4.5,
+              user_ratings_total: 100,
             },
           ],
         }),
@@ -276,6 +279,7 @@ describe("ATM Actions", () => {
 
       const result = await searchNearbyATMs(37.7749, -122.4194);
 
+      expect(result.length).toBeGreaterThan(0);
       expect(result[0].distance).toBeCloseTo(0, 2);
     });
   });
